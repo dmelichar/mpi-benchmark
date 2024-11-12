@@ -1,0 +1,42 @@
+{
+    "benchmark_name": "test_scatterv",
+    "test_suite": [
+        {
+            "test_name": "blocking_scatterv_increasing",
+            "test_type": "bandwidth",
+            "communication_pattern": {
+                "type": "collective",
+                "mode": "blocking",
+                "collective_operation": "scatterv",
+                "vector_variant_config": {
+                    "distribution_pattern": "increasing",
+                    "size_variation": {
+                        "min_factor": 0.5,
+                        "max_factor": 2.0
+                    }
+                }
+            },
+            "message_size": {
+                "min": 1024,
+                "max": 1048576,
+                "increment_type": "power_of_two"
+            },
+            "iterations": {
+                "warmup": 100,
+                "testing": 1000
+            }
+        }
+    ],
+    "global_config": {
+        "max_runtime": 3600,
+        "processes": {
+            "min": 4,
+            "max": 16
+        },
+        "output": {
+            "format": "csv",
+            "directory": "/results",
+            "verbose": true
+        }
+    }
+}
