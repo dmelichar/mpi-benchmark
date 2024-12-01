@@ -13,8 +13,6 @@ class Scatterv {
     int size;
     std::vector<double> timings;
     
-
-    
   public:
     Scatterv() {
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -28,7 +26,7 @@ class Scatterv {
     }
     
     // Prepare messages according to distr
-    void setup (size_t base_msg_size, const std::string &distribution = "increasing") {
+    void setup () {
 
     }
 
@@ -38,6 +36,12 @@ class Scatterv {
     }
 
     void run (int iterations) {
+        // For calculating timings
+        double timer = 0.0;
+        double latency = 0.0;
+        double t_start = 0.0;
+        double t_stop = 0.0;
+
         // Prepare send counts and displacements
         std::vector<int> sendcounts(size);
         std::vector<int> displs(size);
@@ -67,7 +71,6 @@ class Scatterv {
         }
 
         for (int i = 0; i < iterations; i++) {
-            // TODO Why?
             MPI_Barrier(MPI_COMM_WORLD); 
 
             auto start = std::chrono::high_resolution_clock::now();

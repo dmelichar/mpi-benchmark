@@ -38,10 +38,10 @@ The following features are up to be implemented
         - [ ] `MPI_Recv`
         - [ ] `MPI_Send`
     - Reduction
-        - [ ] `MPI_Allreduce
-- [ ] Error handling
+        - [ ] `MPI_Allreduce`
+- [x] Error handling
 - [ ] Logging
-- [ ] Setup bound by max runtime
+- [x] Setup bound by max runtime
 - [ ] Process check
 
 

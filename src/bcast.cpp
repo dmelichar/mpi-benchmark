@@ -2,88 +2,165 @@
 #include <chrono>
 #include <cmath>
 #include <iostream>
-#include <mpi.h>
 #include <numeric>
 #include <vector>
 #include <fstream>
 
+#include <mpi.h>
+
 class Bcast {
-  private:
+private:
     int rank;
-    int size;
+    int csize;
+    std::vector<double> buffer;
     std::vector<double> timings;
 
-  public:
+    // Prepare messages 
+    void setup (size_t max_msg_size) {
+        try {
+            buffer.resize(max_msg_size);
+            // TODO Not sure if this actually makes a difference
+            if (rank == 0) {
+                std::iota(buffer.begin(), buffer.end(), 0); 
+            } else {
+                std::fill(buffer.begin(), buffer.end(), 0);
+            }
+        } catch (const std::bad_alloc& e) {
+            std::cerr << "Could not allocate memory [rank " << rank << "]: " 
+                      << e.what() << std::endl;
+            MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+        }
+    }
+
+public:
    Bcast () {
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        MPI_Comm_size(MPI_COMM_WORLD, &size);
+        MPI_Comm_size(MPI_COMM_WORLD, &csize);
 
-        if (size < 2) {
-            std::cout << "ERROR: Need more than one process." << std::endl;
-            MPI_Finalize();
-            exit(EXIT_FAILURE);
-        }
-    }
-    
-    // Prepare messages according to distr
-    void setup (size_t base_msg_size, const std::string &distribution = "increasing") {
-
-        // Prepare send counts and displacements
-        std::vector<int> sendcounts(size);
-        std::vector<int> displs(size);
-        
-        // Calculate send counts based on distribution pattern
-        size_t total_elements = 0;
-        for (int i = 0; i < size; i++) {
-            if (distribution == "increasing") {
-                sendcounts[i] = base_msg_size * (i + 1) / sizeof(double);
-            } else if (distribution == "uniform") {
-                sendcounts[i] = base_msg_size / sizeof(double);
+        if (rank == 0) {
+            if (csize < 2) {
+                std::cerr << "ERROR: Need more than one process." << std::endl;
+                MPI_Finalize();
+                std::exit(EXIT_FAILURE);
             }
-            displs[i] = total_elements;
-            total_elements += sendcounts[i];
-        }
-
-        // Prepare send and receive buffers
-        std::vector<double> sendbuf;
-        std::vector<double> recvbuf(sendcounts[rank]);
-        if (rank == 0) {
-            sendbuf.resize(total_elements);
-            std::iota(sendbuf.begin(), sendbuf.end(), 0); 
         }
     }
 
-    void run (int iterations) {
-        // Prepare measurement vector
-        timings.clear();
-        timings.reserve(iterations);
+    void run (size_t min_msg_size, size_t max_msg_size, double max_seconds = 1, bool verbose = false) { 
+        setup(max_msg_size);
 
-        for (int i = 0; i < iterations; i++) {
-            // TODO This may not be necessary
-            MPI_Barrier(MPI_COMM_WORLD);
-
-            auto start = std::chrono::high_resolution_clock::now();
-            MPI_Bcast(
-                    // void* buffer
-                    // int count
-                    // MPI Datatype datatype
-                    // int root, 
-                    // MPI Comm
-            );   
-
-            auto end = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-
-            timings.push_back(duration);
+        if (rank == 0 && verbose) {
+            std::cout << std::left 
+                      << std::setw(25) << "Size (Bytes)" 
+                      << std::setw(25) << "Avg Latency (s)" 
+                      << std::setw(25) << "Min Latency (s)" 
+                      << std::setw(25) << "Max Latency (s)" 
+                      << std::endl;
         }
+        
+        // Incrementing messages
+        for (size_t size = min_msg_size; size <= max_msg_size; size *= 2) {
+            double timer = 0.0;
+            double latency = 0.0;
+            double min_time = 0.0, max_time = 0.0, avg_time = 0.0;
+            int iter = 0;
 
-        // Calculate statistics
-        if (rank == 0) {
+            // Global clock
+            double global_start_time = 0.0;
+            if (rank == 0) {
+                global_start_time = MPI_Wtime();
+            }
+            MPI_Bcast(&global_start_time, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+            
+            // Time-based measurement
+            while (true) {    
+                double t_start = MPI_Wtime();
+                MPI_Bcast(buffer.data(), size, MPI_CHAR, 0, MPI_COMM_WORLD);
+                double t_stop = MPI_Wtime();
+
+                timer += t_stop - t_start;
+                iter++;
+                // TODO Maybe mod. Need though, otherwise filesize issues
+                if (iter % 100 == 0) {
+                    timings.push_back(timer);
+                }
+                MPI_Barrier(MPI_COMM_WORLD);
+
+                bool continue_loop = true;
+                if (rank == 0) {
+                    double elapsed_time = MPI_Wtime() - global_start_time; 
+                    continue_loop = (elapsed_time < max_seconds);
+                }
+                MPI_Bcast(&continue_loop, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+                if (!continue_loop) break;
+            }
+
+            // Calculate latency
+            // TODO Maybe convert to microseconds
+            latency = timer / iter;
+
+            // Reduce operations to get min, max, and average times
+            MPI_Reduce(&latency, &min_time, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
+            MPI_Reduce(&latency, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+
+            MPI_Reduce(&latency, &avg_time, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+            avg_time /= csize;
+
+            if (rank == 0 && verbose) {
+                std::cout << std::left
+                          << std::setw(25) << size
+                          << std::setw(25) << avg_time
+                          << std::setw(25) << min_time
+                          << std::setw(25) << max_time
+                          << std::endl;
+            }
         }
     }
 
     // Save data to file
-    void save() {
+    void save_latencies(const std::string &filename) {
+        int num_timings = timings.size();
+        std::vector<int> counts(csize);
+        std::vector<int> displacements(csize);
+        
+        MPI_Gather(&num_timings, 1, MPI_INT, counts.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
+        
+        if (rank == 0) {
+            displacements[0] = 0;
+            for (int i = 1; i < csize; ++i) {
+                displacements[i] = displacements[i - 1] + counts[i - 1];
+            }
+        }
+
+        int total_timings = std::accumulate(counts.begin(), counts.end(), 0);
+        std::vector<double> all_timings(total_timings);
+
+        MPI_Gatherv(timings.data(),
+                    num_timings,
+                    MPI_DOUBLE, 
+                    all_timings.data(),
+                    counts.data(),
+                    displacements.data(),
+                    MPI_DOUBLE, 
+                    0, 
+                    MPI_COMM_WORLD);
+        
+        if (rank == 0) {
+            std::ofstream out_file(filename);
+            if (!out_file) {
+                std::cerr << "Error: Unable to open file " << filename << " for writing." << std::endl;
+                exit(EXIT_FAILURE);
+            }
+            out_file << "Rank,Iteration,Latency\n";
+            int idx = 0;
+            for (int r = 0; r < csize; ++r) {
+                for (int i = 0; i < counts[r]; ++i) {
+                    out_file << r << "," << i << "," << all_timings[idx++] << "\n";
+                }
+            }
+            out_file.close();
+            std::cout << "Latencies saved to " << filename << std::endl;
+        }
 
     }
 };
@@ -91,14 +168,19 @@ class Bcast {
 int main(int argc, char *argv[]) {
 
     MPI_Init(&argc, &argv); 
-    Scatterv benchmark;
+    try { 
+        Bcast benchmark;
+        // Test different message sizes
+        std::vector<size_t> msg_sizes = {1024};   
+        for (auto msg_size : msg_sizes) {
+            // min, max, seconds, verbose
+            benchmark.run(1, msg_size, 1, true);
+            benchmark.save_latencies("latencies.csv");
+        }
 
-    // Test different message sizes
-    std::vector<size_t> msg_sizes = {1024, 2048, 4096, 8192};    
-    for (auto msg_size : msg_sizes) {
-        // Run benchmark with increasing distribution
-        benchmark.run(msg_size, 1000, "increasing");
-        benchmark.run(msg_size, 1000, "uniform");
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 
     MPI_Finalize();
