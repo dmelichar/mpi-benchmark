@@ -10,8 +10,10 @@
 
 // TODO Maybe other mod. Need though, otherwise filesize issues
 const int TIMINGS_GRANULARITY = 100;
+// For dummy_compute
+const int DIM = 10;
 
-class Bcast {
+class IBcast {
 private:
     int rank;
     int csize;
@@ -35,6 +37,21 @@ private:
         }
     }
 
+    void dummy_compute() {
+        double target_sec = 0.0;
+        double time_elapsed = 0.0;
+        
+
+        while (time_elapsed < target_sec) {
+            double t1 = MPI_Wtime();  
+            
+            // TODO
+
+            double t2 = MPI_Wtime();
+            time_elapsed += (t2-t1);
+        }
+    }
+
 public:
    Bcast () {
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -51,6 +68,9 @@ public:
 
     void run (size_t min_msg_size, size_t max_msg_size, double max_seconds = 1, bool verbose = false) { 
         setup(max_msg_size);
+
+        MPI_Request request;
+        MPI_Status status;
 
         if (rank == 0 && verbose) {
             std::cout << std::left 
@@ -78,16 +98,30 @@ public:
             // Time-based measurement
             while (true) {    
                 double t_start = MPI_Wtime();
-                MPI_Bcast(buffer.data(), size, MPI_CHAR, 0, MPI_COMM_WORLD);
+
+                double init_time = MPI_Wtime();
+                MPI_Ibcast(buffer.data(), size, MPI_CHAR, 0, MPI_COMM_WORLD, &request);
+                double init_time = MPI_Wtime() - init_time;
+
+                tcomp = MPI_Wtime();
+                // TODO Implement dummy_compute
+                test_time = dummy_compute(latency_in_secs, &request);
+                tcomp = MPI_Wtime() - tcomp;
+
+                wait_time = MPI_Wtime();
+                MPI_Wait(&request,&status);
+                wait_time = MPI_Wtime() - wait_time;
+
                 double t_stop = MPI_Wtime();
 
+                // TODO Also need to add init_time, tcomp, wait_time to a vector
                 timer += t_stop - t_start;
                 iter++;
                 if (iter % TIMINGS_GRANULARITY == 0) {
                     timings.push_back(timer);
                 }
                 MPI_Barrier(MPI_COMM_WORLD);
-
+            
                 bool continue_loop = true;
                 if (rank == 0) {
                     double elapsed_time = MPI_Wtime() - global_start_time; 
@@ -96,9 +130,8 @@ public:
                 MPI_Bcast(&continue_loop, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
                 if (!continue_loop) break;
             }
-            MPI_Barrier(MPI_COMM_WORLD);
 
-            // Calculate latency in microseconds
+            // Calculate latency
             latency = (timer * 1e6) / iter;
 
             // Reduce operations to get min, max, and average times
@@ -107,6 +140,8 @@ public:
 
             MPI_Reduce(&latency, &avg_time, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
             avg_time /= csize;
+
+            // TODO Also need to get init_time, tcomp, wait_time by reduce
 
             if (rank == 0 && verbose) {
                 std::cout << std::left
@@ -121,6 +156,7 @@ public:
 
     // Save data to file
     void save_latencies(const std::string &filename) {
+        // TODO Need to add init_time, tcomb, wait_time
         int num_timings = timings.size();
         std::vector<int> counts(csize);
         std::vector<int> displacements(csize);
@@ -171,7 +207,7 @@ int main(int argc, char *argv[]) {
 
     MPI_Init(&argc, &argv); 
     try { 
-        Bcast benchmark;
+        IBcast benchmark;
         // Test different message sizes
         std::vector<size_t> msg_sizes = {1024};   
         for (auto msg_size : msg_sizes) {

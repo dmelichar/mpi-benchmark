@@ -15,18 +15,20 @@ class Bcast {
 private:
     int rank;
     int csize;
-    std::vector<double> buffer;
+    std::vector<double> sbuffer;
+    std::vector<double> rbuffer;
     std::vector<double> timings;
 
     // Prepare messages 
     void setup (size_t max_msg_size) {
         try {
-            buffer.resize(max_msg_size);
+            sbuffer.resize(max_msg_size);
+            rbuffer.resize(max_msg_size);
             // TODO Doesn't really makes a difference
             if (rank == 0) {
-                std::iota(buffer.begin(), buffer.end(), 0); 
+                std::iota(sbuffer.begin(), sbuffer.end(), 0); 
             } else {
-                std::fill(buffer.begin(), buffer.end(), 0);
+                std::fill(rbuffer.begin(), rbuffer.end(), 0);
             }
         } catch (const std::bad_alloc& e) {
             std::cerr << "Could not allocate memory [rank " << rank << "]: " 
@@ -78,7 +80,7 @@ public:
             // Time-based measurement
             while (true) {    
                 double t_start = MPI_Wtime();
-                MPI_Bcast(buffer.data(), size, MPI_CHAR, 0, MPI_COMM_WORLD);
+                MPI_Allgather(sbuffer, size, MPI_DOUBLE, rbuffer, size, MPI_DOUBLE, MPI_COMM_WORLD);
                 double t_stop = MPI_Wtime();
 
                 timer += t_stop - t_start;
