@@ -53,7 +53,7 @@ private:
     }
 
 public:
-   Bcast () {
+   IBcast () {
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         MPI_Comm_size(MPI_COMM_WORLD, &csize);
 
@@ -101,14 +101,14 @@ public:
 
                 double init_time = MPI_Wtime();
                 MPI_Ibcast(buffer.data(), size, MPI_CHAR, 0, MPI_COMM_WORLD, &request);
-                double init_time = MPI_Wtime() - init_time;
+                init_time = MPI_Wtime() - init_time;
 
-                tcomp = MPI_Wtime();
+                double tcomp = MPI_Wtime();
                 // TODO Implement dummy_compute
-                test_time = dummy_compute(latency_in_secs, &request);
+                //double test_time = dummy_compute(latency_in_secsw, &request);
                 tcomp = MPI_Wtime() - tcomp;
 
-                wait_time = MPI_Wtime();
+                double wait_time = MPI_Wtime();
                 MPI_Wait(&request,&status);
                 wait_time = MPI_Wtime() - wait_time;
 
@@ -213,7 +213,7 @@ int main(int argc, char *argv[]) {
         for (auto msg_size : msg_sizes) {
             // min, max, seconds, verbose
             benchmark.run(1, msg_size, 1, true);
-            benchmark.save_latencies("latencies.csv");
+            benchmark.save_latencies("ibcast-latencies.csv");
         }
 
     } catch (const std::exception& e) {

@@ -1,5 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import argparse
 
 def plot_latencies(filename):
     data = pd.read_csv(filename)
@@ -17,6 +18,8 @@ def plot_latencies(filename):
     plt.show()
 
 if __name__ == "__main__":
-    csv_filename = "latencies.csv"  # Adjust this if the file has a different name
-    plot_latencies(csv_filename)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('filename')
+    args = parser.parse_args()
+    plot_latencies(args.filename)
 

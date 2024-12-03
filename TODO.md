@@ -40,7 +40,7 @@ The following features are up to be implemented
     - Reduction
         - [ ] `MPI_Allreduce`
 - [ ] Error handling in MPI 
-- [ ] Logging with unique identifier
+- [ ] Logging 
 - [x] Setup bound by max runtime
-
+- [ ] Implement realistic data generating process
 

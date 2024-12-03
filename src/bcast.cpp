@@ -177,7 +177,7 @@ int main(int argc, char *argv[]) {
         for (auto msg_size : msg_sizes) {
             // min, max, seconds, verbose
             benchmark.run(1, msg_size, 1, true);
-            benchmark.save_latencies("latencies.csv");
+            benchmark.save_latencies("bcast-latencies.csv");
         }
 
     } catch (const std::exception& e) {

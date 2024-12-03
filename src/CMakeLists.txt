@@ -6,10 +6,16 @@ include_directories(${MPI_INCLUDE_PATH})
 
 add_executable(main main.cpp)
 add_executable(bcast bcast.cpp)
+add_executable(allgather allgather.cpp)
+add_executable(ibcast ibcast.cpp)
+add_executable(scatterv scatterv.cpp)
 add_executable(json json.cpp)
 
 target_link_libraries(main PRIVATE ${MPI_LIBRARIES})
 target_link_libraries(bcast PRIVATE ${MPI_LIBRARIES})
+target_link_libraries(allgather PRIVATE ${MPI_LIBRARIES})
+target_link_libraries(ibcast PRIVATE ${MPI_LIBRARIES})
+target_link_libraries(scatterv PRIVATE ${MPI_LIBRARIES})
 
 target_link_libraries(json PRIVATE nlohmann_json::nlohmann_json)
 target_link_libraries(json PRIVATE nlohmann_json_schema_validator)

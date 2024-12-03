@@ -7,11 +7,12 @@
 #include <fstream>
 
 #include <mpi.h>
+#include <iomanip>
 
 // TODO Maybe other mod. Need though, otherwise filesize issues
 const int TIMINGS_GRANULARITY = 100;
 
-class Bcast {
+class Allgather {
 private:
     int rank;
     int csize;
@@ -24,7 +25,8 @@ private:
         try {
             sbuffer.resize(max_msg_size);
             rbuffer.resize(max_msg_size);
-            // TODO Doesn't really makes a difference
+            // TODO Does this make makes a difference?
+            // Could use https://en.cppreference.com/w/cpp/numeric/random
             if (rank == 0) {
                 std::iota(sbuffer.begin(), sbuffer.end(), 0); 
             } else {
@@ -38,7 +40,7 @@ private:
     }
 
 public:
-   Bcast () {
+   Allgather () {
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         MPI_Comm_size(MPI_COMM_WORLD, &csize);
 
@@ -76,11 +78,13 @@ public:
                 global_start_time = MPI_Wtime();
             }
             MPI_Bcast(&global_start_time, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-            
+            std::cout << "[" << rank << "] OK: Global clock" << std::endl;
+           
+            MPI_Barrier(MPI_COMM_WORLD);
             // Time-based measurement
             while (true) {    
                 double t_start = MPI_Wtime();
-                MPI_Allgather(sbuffer, size, MPI_DOUBLE, rbuffer, size, MPI_DOUBLE, MPI_COMM_WORLD);
+                MPI_Allgather(sbuffer.data(), size, MPI_DOUBLE, rbuffer.data(), size, MPI_DOUBLE, MPI_COMM_WORLD);
                 double t_stop = MPI_Wtime();
 
                 timer += t_stop - t_start;
@@ -98,6 +102,7 @@ public:
                 MPI_Bcast(&continue_loop, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
                 if (!continue_loop) break;
             }
+            std::cout << "[" << rank << "] OK: Measurement" << std::endl;
             MPI_Barrier(MPI_COMM_WORLD);
 
             // Calculate latency in microseconds
@@ -173,13 +178,20 @@ int main(int argc, char *argv[]) {
 
     MPI_Init(&argc, &argv); 
     try { 
-        Bcast benchmark;
+        Allgather benchmark;
         // Test different message sizes
-        std::vector<size_t> msg_sizes = {1024};   
+        std::vector<size_t> msg_sizes = {
+            1024,        // 1 KB
+            4 * 1024,    // 4 KB
+            16 * 1024,   // 16 KB
+            64 * 1024,   // 64 KB
+            256 * 1024,  // 256 KB
+            1024 * 1024  // 1 MB
+        };   
         for (auto msg_size : msg_sizes) {
             // min, max, seconds, verbose
             benchmark.run(1, msg_size, 1, true);
-            benchmark.save_latencies("latencies.csv");
+            benchmark.save_latencies("allgather-latencies.csv");
         }
 
     } catch (const std::exception& e) {
