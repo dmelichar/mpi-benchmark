@@ -1,17 +1,16 @@
 # .clang-format
 
 BasedOnStyle: LLVM  # You can choose styles like LLVM, Google, Chromium, etc.
-IndentWidth: 4      # Number of spaces for each indentation level
-TabWidth: 4         # Number of spaces a tab counts for
+IndentWidth: 8      # Number of spaces for each indentation level
+TabWidth: 8         # Number of spaces a tab counts for
 UseTab: Never        # Use spaces instead of tabs
-ColumnLimit: 80     # Maximum line length
+ColumnLimit: 120     # Maximum line length
 AllowShortBlocksOnASingleLine: Empty              # Controls single line blocks
 BreakBeforeBraces: Custom  # Brace style for functions and control statements
 BraceWrapping:
   AfterFunction: true
 BinPackArguments: false
 AllowAllParametersOfDeclarationOnNextLine: false
-ColumnLimit: 0
 
 SpaceBeforeParens: ControlStatements  # Spaces before parentheses in control statements
 SortIncludes: true  # Sort include directives

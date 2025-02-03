@@ -1,41 +1,49 @@
 {
-    "benchmark_name": "test_scatterv",
+    "benchmark_name": "test_scatterv_bcast",
     "test_suite": [
         {
-            "test_name": "blocking_scatterv_increasing",
-            "test_type": "bandwidth",
+            "test_name": "blocking_scatterv_zipfian",
+            "test_type": "latency",
             "communication_pattern": {
-                "type": "collective",
                 "mode": "blocking",
-                "collective_operation": "scatterv",
-                "vector_variant_config": {
-                    "distribution_pattern": "increasing",
-                    "size_variation": {
-                        "min_factor": 0.5,
-                        "max_factor": 2.0
-                    }
-                }
+                "collective_operation": "scatterv"
             },
-            "message_size": {
-                "min": 1024,
-                "max": 1048576,
-                "increment_type": "power_of_two"
+            "messages_data": "4-zipfian.cv"
+        },
+        {
+            "test_name": "bcast_custom",
+            "test_type": "latency",
+            "communication_pattern": {
+                "mode": "blocking",
+                "collective_operation": "bcast"
             },
-            "iterations": {
-                "warmup": 100,
-                "testing": 1000
-            }
+            "messages_data": "custom.csv"
+        },
+        {
+            "test_name": "bcast_equal",
+            "test_type": "latency",
+            "communication_pattern": {
+                "mode": "blocking",
+                "collective_operation": "bcast"
+            },
+            "messages": "4-equal.csv"
+        },
+        {
+            "test_name": "bcast_normal",
+            "test_type": "latency",
+            "communication_pattern": {
+                "mode": "blocking",
+                "collective_operation": "bcast"
+            },
+            "messages_data": "4-normal.csv" 
         }
     ],
     "global_config": {
         "max_runtime": 3600,
-        "processes": {
-            "min": 4,
-            "max": 16
-        },
+        "processes": 4,
         "output": {
-            "format": "csv",
-            "directory": "/results",
+            "encoding": "csv",
+            "directory": "./results",
             "verbose": true
         }
     }
