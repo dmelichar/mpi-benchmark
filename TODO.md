@@ -7,7 +7,6 @@ The following features are up to be implemented
 - [ ] (optional) Setup plots with e.g. [Matplot++](https://github.com/alandefreitas/matplotplusplus?tab=readme-ov-file)
 - [X] Export response time and throughput to `csv`
 - [ ] Benchmarking functions for
-
   - Collectives blocking
     - [ ] `MPI_Allgather`
     - [ ] `MPI_Allgatherv`
@@ -18,7 +17,6 @@ The following features are up to be implemented
     - [ ] `MPI_Gatherv`
     - [ ] `MPI_Scatter`
     - [ ] `MPI_Scatterv`
-
   - [ ] Collectives non-blocking
     - [ ] `MPI_Iallgather`
     - [ ] `MPI_Iallgatherv`
@@ -29,7 +27,6 @@ The following features are up to be implemented
     - [ ] `MPI_Igatherv`
     - [ ] `MPI_Iscatter`
     - [ ] `MPI_Iscatterv`
-
   - One-Sided
     - [ ] `MPI_Put`
     - [ ] `MPI_Get`
@@ -47,3 +44,4 @@ The following features are up to be implemented
 - [ ] Update schema.json
 - [ ] Add multiple trials to calculate variance
 - [ ] Figure out how to do bandwidth, message rate tests
+- [ ] Test on Hydra with 32 machines with one process each, number of messages is arbitrary

@@ -1,6 +1,4 @@
 import numpy as np
-import os
-import csv
 import argparse
 
 
@@ -43,16 +41,11 @@ def dgp(nproc, m2m, dist, filename, seed):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
+    parser.add_argument("--nproc", type=int, required=True, help="Number of processes")
     parser.add_argument(
-        "--nproc",
-        type=int, 
-        required=True, 
-        help="Number of processes"
-    )
-    parser.add_argument(
-        "--m2m", 
-        action="store_true", 
-        help="Enable many-to-many communication. This creates a matrix m_ij where the process i sends m_ij messages to the process j. (default is False)"
+        "--m2m",
+        action="store_true",
+        help="Enable many-to-many communication. This creates a matrix m_ij where the process i sends m_ij messages to the process j. (default is False)",
     )
     parser.add_argument(
         "--dist",

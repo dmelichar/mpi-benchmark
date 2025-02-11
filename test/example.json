@@ -2,49 +2,32 @@
     "benchmark_name": "test_scatterv_bcast",
     "test_suite": [
         {
-            "test_name": "blocking_scatterv_zipfian",
-            "test_type": "latency",
-            "communication_pattern": {
-                "mode": "blocking",
-                "collective_operation": "scatterv"
-            },
-            "messages_data": "4-zipfian.cv"
-        },
-        {
             "test_name": "bcast_custom",
             "test_type": "latency",
-            "communication_pattern": {
-                "mode": "blocking",
-                "collective_operation": "bcast"
-            },
+            "collective": "bcast",
             "messages_data": "custom.csv"
         },
         {
             "test_name": "bcast_equal",
             "test_type": "latency",
-            "communication_pattern": {
-                "mode": "blocking",
-                "collective_operation": "bcast"
-            },
-            "messages": "4-equal.csv"
+            "collective": "bcast",
+            "messages_data": "4-equal.csv"
         },
         {
             "test_name": "bcast_normal",
             "test_type": "latency",
-            "communication_pattern": {
-                "mode": "blocking",
-                "collective_operation": "bcast"
-            },
+            "collective": "bcast",
             "messages_data": "4-normal.csv" 
         }
     ],
     "global_config": {
         "max_runtime": 3600,
         "processes": 4,
+        "trials": 1,
         "output": {
             "encoding": "csv",
             "directory": "./results",
-            "verbose": true
+            "verbose": false
         }
     }
 }

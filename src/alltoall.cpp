@@ -9,29 +9,25 @@
 
 #include <mpi.h>
 
-// TODO Maybe other mod. Needed though, otherwise filesize issues
-constexpr int TIMINGS_GRANULARITY = 100;
+// TODO Maybe other mod. Need though, otherwise filesize issues
+const int TIMINGS_GRANULARITY = 100;
 
-class Bcast {
+class Alltoall {
+
         int rank{};
         int csize{};
-        std::vector<double> buffer;
+        std::vector<double> sbuffer;
+        std::vector<double> rbuffer;
         std::vector<double> timings;
 
         // Prepare messages
-        void setup(const size_t msg_size)
+        void setup(const std::string &filename)
         {
-                try {
-                        buffer.resize(msg_size);
-                        std::ranges::fill(buffer, 0);
-                } catch (const std::bad_alloc &e) {
-                        std::cerr << "Could not allocate memory [rank " << rank << "]: " << e.what() << std::endl;
-                        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-                }
+                // TODO
         }
 
       public:
-        Bcast()
+        Alltoall()
         {
                 MPI_Comm_rank(MPI_COMM_WORLD, &rank);
                 MPI_Comm_size(MPI_COMM_WORLD, &csize);
@@ -43,19 +39,13 @@ class Bcast {
                 }
         }
 
-        void run(const size_t msg_size, const double max_seconds = 1, const bool verbose = false)
+        void run(const std::string &filename, const double max_seconds = 1, const bool verbose = false)
         {
-                setup(msg_size);
-                int msg_size_int;
-                if (msg_size <= static_cast<size_t>(std::numeric_limits<int>::max())) {
-                        msg_size_int = static_cast<int>(msg_size);
-                } else {
-                        msg_size_int = std::numeric_limits<int>::max();
-                }
+                setup(filename);
 
                 if (rank == 0 && verbose) {
                         // clang-format off
-                        std::cout << std::left << std::setw(25) << "Size (Bytes)" 
+                        std::cout << std::left << std::setw(25) << "Size (Bytes)"
                                                << std::setw(25) << "Avg Latency (μs)"
                                                << std::setw(25) << "Min Latency (μs)"
                                                << std::setw(25) << "Max Latency (μs)"
@@ -66,7 +56,6 @@ class Bcast {
                 double timer = 0.0;
                 double latency = 0.0;
                 double min_time = 0.0, max_time = 0.0, avg_time = 0.0;
-                int iter = 0;
 
                 // Global clock
                 double global_start_time = 0.0;
@@ -75,11 +64,14 @@ class Bcast {
                 }
                 MPI_Bcast(&global_start_time, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
+                int iter = 0;
                 // Time-based measurement
                 while (true) {
-                        const double t_start = MPI_Wtime();
-                        MPI_Bcast(buffer.data(), msg_size_int, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-                        const double t_stop = MPI_Wtime();
+                        double t_start = MPI_Wtime();
+
+                        // MPI_Gatherv(sbuffer.data(),, MPI_DOUBLE, rbuffer.data(), size, MPI_DOUBLE,
+                        // MPI_COMM_WORLD);
+                        double t_stop = MPI_Wtime();
 
                         timer += t_stop - t_start;
                         iter++;
@@ -90,8 +82,8 @@ class Bcast {
 
                         bool continue_loop = true;
                         if (rank == 0) {
-                                const double elapsed_time = MPI_Wtime() - global_start_time;
-                                continue_loop = elapsed_time < max_seconds;
+                                double elapsed_time = MPI_Wtime() - global_start_time;
+                                continue_loop = (elapsed_time < max_seconds);
                         }
                         MPI_Bcast(&continue_loop, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
                         if (!continue_loop)
@@ -112,14 +104,13 @@ class Bcast {
                 if (rank == 0 && verbose) {
                         // clang-format off
                         std::cout << std::left
-                                  << std::setw(25) << msg_size
+                                  //<< std::setw(25) << buffer.size()
                                   << std::setw(25) << avg_time
                                   << std::setw(25) << min_time
                                   << std::setw(25) << max_time
-                        << std::endl;
+                                  << std::endl;
                         // clang-format on
                 }
-
         }
 
         // Save data to file
@@ -131,7 +122,6 @@ class Bcast {
                 } else {
                         num_timings = std::numeric_limits<int>::max();
                 }
-
                 std::vector<int> counts(csize);
                 std::vector<int> displacements(csize);
 
@@ -188,9 +178,11 @@ int main(int argc, char *argv[])
                                        {"verbose", no_argument, nullptr, 'v'},
                                        {nullptr, 0, nullptr, 0}};
 
+        std::string fmessages = "default_messages.txt";
         std::string foutput = "default_output.txt";
         int timeout = 30;
         bool verbose = false;
+
         int opt;
 
         while ((opt = getopt_long(argc, argv, "hm:o:n:t:v", long_options, nullptr)) != -1) {
@@ -200,13 +192,13 @@ int main(int argc, char *argv[])
                             << "Help: This program runs a MPI bcast .\n"
                             << "Options:\n"
                             << "  -h, --help            Show this help message\n"
-                            << "  -m, --fmessages FILE  NOT IMPLEMENTED\n"
+                            << "  -m, --fmessages FILE  Specify file with messages (default: default_messages.txt)\n"
                             << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
                             << "  -t, --timeout NUM     Specify timeout value in seconds (default: 30)\n"
                             << "  -v, --verbose         Enable verbose mode\n";
                         return EXIT_SUCCESS;
                 case 'm':
-                        // Not implemented
+                        fmessages = optarg;
                         break;
                 case 'o':
                         foutput = optarg;
@@ -226,8 +218,8 @@ int main(int argc, char *argv[])
 
         MPI_Init(&argc, &argv);
         try {
-                Bcast benchmark;
-                benchmark.run(1024, timeout, verbose);
+                Alltoall benchmark;
+                benchmark.run(fmessages, timeout, verbose);
                 benchmark.save_latencies(foutput, verbose);
         } catch (const std::exception &e) {
                 std::cerr << "Error: " << e.what() << std::endl;
