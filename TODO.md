@@ -45,3 +45,4 @@ The following features are up to be implemented
 - [ ] Add multiple trials to calculate variance
 - [ ] Figure out how to do bandwidth, message rate tests
 - [ ] Test on Hydra with 32 machines with one process each, number of messages is arbitrary
+- [ ] Add a memory check to see if `sum(sendcounts)` memory is available for Scatterv/sbuffer and Gatherv/rbuffer and MPI limit reached

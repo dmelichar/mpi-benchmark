@@ -3,16 +3,13 @@
 #include <cmath>
 #include <fstream>
 #include <getopt.h>
+#include <iomanip>
 #include <iostream>
 #include <numeric>
 #include <sstream>
 #include <vector>
-#include <iomanip>
 
 #include <mpi.h>
-
-// TODO Maybe other mod. Need though, otherwise filesize issues
-constexpr int TIMINGS_GRANULARITY = 100;
 
 class Scatterv {
 
@@ -69,7 +66,6 @@ class Scatterv {
                                 ++value;
                         }
 
-
                         sendcounts = row;
                         displs.assign(row.size(), 0);
                         for (int i = 1; i < row.size(); ++i) {
@@ -82,7 +78,6 @@ class Scatterv {
                 rbuffer.resize(sendcounts[rank]);
                 MPI_Barrier(MPI_COMM_WORLD);
         }
-
 
       public:
         Scatterv()
@@ -119,7 +114,7 @@ class Scatterv {
 
                 // TODO This could probably be improved
                 while (true) {
-                        //unsigned long iter = 0;
+                        // unsigned long iter = 0;
                         const double t_start = MPI_Wtime();
                         MPI_Scatterv(sbuffer.data(),
                                      sendcounts.data(),
@@ -132,10 +127,6 @@ class Scatterv {
                                      MPI_COMM_WORLD);
                         const double t_stop = MPI_Wtime();
 
-                        //iter++;
-                        //if (iter % TIMINGS_GRANULARITY == 0) {
-                        //        timings.push_back(t_stop - t_start);
-                        //}
                         timings.push_back(t_stop - t_start);
                         MPI_Barrier(MPI_COMM_WORLD);
 
@@ -150,10 +141,6 @@ class Scatterv {
                 }
                 MPI_Barrier(MPI_COMM_WORLD);
 
-                // Calculate timings in microseconds
-                //std::ranges::for_each(timings, [](double& x) {
-                //    x *= 1e6;
-                //});
                 double min_time = 0.0, max_time = 0.0, avg_time = 0.0;
 
                 // Reduce operations to get min, max, and average times
@@ -182,7 +169,7 @@ class Scatterv {
                 std::vector<int> counts(csize);
                 MPI_Gather(&num_timings, 1, MPI_INT, counts.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-                // Process 0 creates or opens the file and writes the header
+                // Process 0 creates or opens the file and writes the header and its own timings to the file first
                 if (rank == 0) {
                         std::ofstream out_file(filename);
                         if (!out_file) {
@@ -193,16 +180,6 @@ class Scatterv {
                         out_file.seekp(0, std::ios::end);
                         if (out_file.tellp() == 0) {
                                 out_file << "Rank,Iteration,Latency\n";
-                        }
-                        out_file.close();
-                }
-
-                // Process 0 will write its own timings to the file first
-                if (rank == 0) {
-                        std::ofstream out_file(filename, std::ios::app);
-                        if (!out_file) {
-                                std::cerr << "ERROR: Unable to open file " << filename << " for writing." << std::endl;
-                                exit(EXIT_FAILURE);
                         }
                         for (int i = 0; i < num_timings; ++i) {
                                 out_file << rank << "," << i << "," << timings[i] << "\n";
@@ -223,7 +200,13 @@ class Scatterv {
                         std::vector<double> recv_timings;
                         for (int r = 1; r < csize; ++r) {
                                 recv_timings.resize(counts[r]);
-                                MPI_Recv(recv_timings.data(), counts[r], MPI_DOUBLE, r, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                                MPI_Recv(recv_timings.data(),
+                                         counts[r],
+                                         MPI_DOUBLE,
+                                         r,
+                                         0,
+                                         MPI_COMM_WORLD,
+                                         MPI_STATUS_IGNORE);
                                 for (int i = 0; i < counts[r]; ++i) {
                                         out_file << r << "," << i << "," << recv_timings[i] << "\n";
                                 }
