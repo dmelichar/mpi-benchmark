@@ -5,13 +5,12 @@
 #include <getopt.h>
 #include <iostream>
 #include <numeric>
+#include <sstream>
 #include <vector>
 #include <iomanip>
 
 #include <mpi.h>
 
-// TODO Maybe other mod. Need though, otherwise filesize issues
-const int TIMINGS_GRANULARITY = 100;
 
 class Allgather {
 
@@ -20,6 +19,8 @@ class Allgather {
         std::vector<double> sbuffer;
         std::vector<double> rbuffer;
         std::vector<double> timings;
+        std::vector<int> displs;
+        std::vector<int> sendcounts;
 
         // Prepare messages
         void setup(const std::string &filename)
@@ -46,17 +47,13 @@ class Allgather {
 
                 if (rank == 0 && verbose) {
                         // clang-format off
-                        std::cout << std::left << std::setw(25) << "Size (Bytes)"
-                                               << std::setw(25) << "Avg Latency (μs)"
-                                               << std::setw(25) << "Min Latency (μs)"
-                                               << std::setw(25) << "Max Latency (μs)"
+                        std::cout << std::left << std::setw(25) << "Messages (count)"
+                                               << std::setw(25) << "Avg Latency (s)"
+                                               << std::setw(25) << "Min Latency (s)"
+                                               << std::setw(25) << "Max Latency (s)"
                                   << std::endl;
                         // clang-format on
                 }
-
-                double timer = 0.0;
-                double latency = 0.0;
-                double min_time = 0.0, max_time = 0.0, avg_time = 0.0;
 
                 // Global clock
                 double global_start_time = 0.0;
@@ -65,26 +62,20 @@ class Allgather {
                 }
                 MPI_Bcast(&global_start_time, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-                int iter = 0;
-                // Time-based measurement
+                // TODO This could probably be improved
                 while (true) {
-                        double t_start = MPI_Wtime();
+                        const double t_start = MPI_Wtime();
 
-                        // MPI_Gatherv(sbuffer.data(),, MPI_DOUBLE, rbuffer.data(), size, MPI_DOUBLE,
-                        // MPI_COMM_WORLD);
-                        double t_stop = MPI_Wtime();
+                        // MPI_Allgather
+                        const double t_stop = MPI_Wtime();
 
-                        timer += t_stop - t_start;
-                        iter++;
-                        if (iter % TIMINGS_GRANULARITY == 0) {
-                                timings.push_back(timer);
-                        }
+                        timings.push_back(t_stop - t_start);
                         MPI_Barrier(MPI_COMM_WORLD);
 
                         bool continue_loop = true;
                         if (rank == 0) {
-                                double elapsed_time = MPI_Wtime() - global_start_time;
-                                continue_loop = (elapsed_time < max_seconds);
+                                const double elapsed_time = MPI_Wtime() - global_start_time;
+                                continue_loop = elapsed_time < max_seconds;
                         }
                         MPI_Bcast(&continue_loop, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
                         if (!continue_loop)
@@ -92,20 +83,18 @@ class Allgather {
                 }
                 MPI_Barrier(MPI_COMM_WORLD);
 
-                // Calculate latency in microseconds
-                latency = (timer * 1e6) / iter;
+                double min_time = 0.0, max_time = 0.0, avg_time = 0.0;
 
                 // Reduce operations to get min, max, and average times
-                MPI_Reduce(&latency, &min_time, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
-                MPI_Reduce(&latency, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-
-                MPI_Reduce(&latency, &avg_time, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+                MPI_Reduce(&timings, &min_time, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
+                MPI_Reduce(&timings, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+                MPI_Reduce(&timings, &avg_time, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
                 avg_time /= csize;
 
                 if (rank == 0 && verbose) {
                         // clang-format off
                         std::cout << std::left
-                                  //<< std::setw(25) << buffer.size()
+                                  << std::setw(25) << rbuffer.size()
                                   << std::setw(25) << avg_time
                                   << std::setw(25) << min_time
                                   << std::setw(25) << max_time
@@ -115,57 +104,60 @@ class Allgather {
         }
 
         // Save data to file
+        // TODO Needs improvement. Big file size too. If NFS, could use MPI_FILE
         void save_latencies(const std::string &filename, const bool verbose = false) const
         {
-                int num_timings;
-                if (timings.size() <= static_cast<size_t>(std::numeric_limits<int>::max())) {
-                        num_timings = static_cast<int>(timings.size());
-                } else {
-                        num_timings = std::numeric_limits<int>::max();
-                }
+                const size_t num_timings = timings.size();
                 std::vector<int> counts(csize);
-                std::vector<int> displacements(csize);
-
                 MPI_Gather(&num_timings, 1, MPI_INT, counts.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-                if (rank == 0) {
-                        displacements[0] = 0;
-                        for (int i = 1; i < csize; ++i) {
-                                displacements[i] = displacements[i - 1] + counts[i - 1];
-                        }
-                }
-
-                int total_timings = std::accumulate(counts.begin(), counts.end(), 0);
-                std::vector<double> all_timings(total_timings);
-
-                MPI_Gatherv(timings.data(),
-                            num_timings,
-                            MPI_DOUBLE,
-                            all_timings.data(),
-                            counts.data(),
-                            displacements.data(),
-                            MPI_DOUBLE,
-                            0,
-                            MPI_COMM_WORLD);
-
+                // Process 0 creates or opens the file and writes the header and its own timings to the file first
                 if (rank == 0) {
                         std::ofstream out_file(filename);
                         if (!out_file) {
-                                std::cerr << "Error: Unable to open file " << filename << " for writing." << std::endl;
+                                std::cerr << "ERROR: Unable to open file " << filename << " for writing." << std::endl;
+                                MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+                        }
+
+                        out_file.seekp(0, std::ios::end);
+                        if (out_file.tellp() == 0) {
+                                out_file << "Rank,Iteration,Latency\n";
+                        }
+                        for (int i = 0; i < num_timings; ++i) {
+                                out_file << rank << "," << i << "," << timings[i] << "\n";
+                        }
+                        out_file.close();
+                } else {
+                        MPI_Send(timings.data(), num_timings, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+                }
+
+                // Process 0 receives and appends timings from all other processes
+                if (rank == 0) {
+                        std::ofstream out_file(filename, std::ios::app);
+                        if (!out_file) {
+                                std::cerr << "ERROR: Unable to open file " << filename << " for writing." << std::endl;
                                 exit(EXIT_FAILURE);
                         }
-                        // TODO: Alternative formats to csv
-                        out_file << "Rank,Iteration,Latency\n";
-                        int idx = 0;
-                        for (int r = 0; r < csize; ++r) {
+
+                        std::vector<double> recv_timings;
+                        for (int r = 1; r < csize; ++r) {
+                                recv_timings.resize(counts[r]);
+                                MPI_Recv(recv_timings.data(),
+                                         counts[r],
+                                         MPI_DOUBLE,
+                                         r,
+                                         0,
+                                         MPI_COMM_WORLD,
+                                         MPI_STATUS_IGNORE);
                                 for (int i = 0; i < counts[r]; ++i) {
-                                        out_file << r << "," << i << "," << all_timings[idx++] << "\n";
+                                        out_file << r << "," << i << "," << recv_timings[i] << "\n";
                                 }
                         }
                         out_file.close();
-                        if (verbose) {
-                                std::cout << "Latencies saved to " << filename << std::endl;
-                        }
+                }
+
+                if (rank == 0 && verbose) {
+                        std::cout << "Latencies saved to " << filename << std::endl;
                 }
         }
 };
@@ -181,7 +173,7 @@ int main(int argc, char *argv[])
 
         std::string fmessages = "default_messages.txt";
         std::string foutput = "default_output.txt";
-        int timeout = 30;
+        int timeout = 10;
         bool verbose = false;
 
         int opt;
@@ -195,7 +187,7 @@ int main(int argc, char *argv[])
                             << "  -h, --help            Show this help message\n"
                             << "  -m, --fmessages FILE  Specify file with messages (default: default_messages.txt)\n"
                             << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
-                            << "  -t, --timeout NUM     Specify timeout value in seconds (default: 30)\n"
+                            << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
                             << "  -v, --verbose         Enable verbose mode\n";
                         return EXIT_SUCCESS;
                 case 'm':
@@ -223,7 +215,7 @@ int main(int argc, char *argv[])
                 benchmark.run(fmessages, timeout, verbose);
                 benchmark.save_latencies(foutput, verbose);
         } catch (const std::exception &e) {
-                std::cerr << "Error: " << e.what() << std::endl;
+                std::cerr << "ERROR: " << e.what() << std::endl;
                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
         }
         MPI_Finalize();

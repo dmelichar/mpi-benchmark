@@ -231,7 +231,7 @@ int main(int argc, char *argv[])
 
         std::string fmessages = "default_messages.txt";
         std::string foutput = "default_output.txt";
-        int timeout = 30;
+        int timeout = 10;
         bool verbose = false;
 
         int opt;
@@ -245,7 +245,7 @@ int main(int argc, char *argv[])
                             << "  -h, --help            Show this help message\n"
                             << "  -m, --fmessages FILE  Specify file with messages (default: default_messages.txt)\n"
                             << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
-                            << "  -t, --timeout NUM     Specify timeout value in seconds (default: 30)\n"
+                            << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
                             << "  -v, --verbose         Enable verbose mode\n";
                         return EXIT_SUCCESS;
                 case 'm':
