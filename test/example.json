@@ -18,16 +18,27 @@
             "test_type": "latency",
             "collective": "bcast",
             "messages_data": "4-normal.csv" 
+        },
+        {
+            "test_name": "gatherv_custom",
+            "test_type": "latency",
+            "collective": "gatherv",
+            "messages_data": "custom.csv"
+        },
+        {
+            "test_name": "scatterv_custom",
+            "test_type": "latency",
+            "collective": "scatterv",
+            "messages_data": "custom.csv"
         }
     ],
     "global_config": {
         "max_runtime": 3600,
         "processes": 4,
-        "trials": 1,
+        "trials": 3,
         "output": {
-            "encoding": "csv",
             "directory": "./results",
-            "verbose": false
+            "verbose": true
         }
     }
 }
