@@ -12,7 +12,7 @@ find_package(Python3 REQUIRED)
 include_directories(${MPI_INCLUDE_PATH})
 
 add_executable(bcast src/bcast.cpp)
-add_executable(allgather src/allgather.cpp)
+add_executable(allgatherv src/allgatherv.cpp)
 add_executable(scatterv src/scatterv.cpp)
 add_executable(gatherv src/gatherv.cpp)
 add_executable(alltoall src/alltoall.cpp)
