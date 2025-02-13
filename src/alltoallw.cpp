@@ -11,8 +11,7 @@
 
 #include <mpi.h>
 
-class Gatherv {
-
+class Alltoallw {
         int rank{};
         int csize{};
         std::vector<double> sbuffer;
@@ -20,6 +19,7 @@ class Gatherv {
         std::vector<double> timings;
         std::vector<int> displs;
         std::vector<int> sendcounts;
+        std::vector<MPI_Datatype> sendtypes;
 
         // Prepare messages
         void setup(const std::string &filename)
@@ -58,7 +58,6 @@ class Gatherv {
                                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
                         }
 
-                        rbuffer.resize(std::accumulate(row.begin(), row.end(), 0));
                         sendcounts = row;
                         displs.assign(row.size(), 0);
                         for (int i = 1; i < row.size(); ++i) {
@@ -76,11 +75,13 @@ class Gatherv {
                         sbuffer[i] = rank;
                 }
 
+                rbuffer.resize(std::accumulate(sendcounts.begin(), sendcounts.end(), 0));
+
                 MPI_Barrier(MPI_COMM_WORLD);
         }
 
 public:
-        Gatherv()
+        Alltoallw()
         {
                 MPI_Comm_rank(MPI_COMM_WORLD, &rank);
                 MPI_Comm_size(MPI_COMM_WORLD, &csize);
@@ -116,15 +117,16 @@ public:
                 // TODO This could probably be improved
                 while (true) {
                         const double t_start = MPI_Wtime();
-                        MPI_Gatherv(sbuffer.data(),
-                                    sendcounts[rank],
-                                    MPI_DOUBLE,
-                                    rbuffer.data(),
-                                    sendcounts.data(),
-                                    displs.data(),
-                                    MPI_DOUBLE,
-                                    0,
-                                    MPI_COMM_WORLD);
+                        MPI_Alltoallw(sbuffer.data(),
+                                      sendcounts.data(),
+                                      displs.data(),
+                                      sendtypes.data(),
+                                      rbuffer.data(),
+                                      sendcounts.data(),
+                                      displs.data(),
+                                      sendtypes.data(),
+                                      MPI_COMM_WORLD
+                                        );
                         const double t_stop = MPI_Wtime();
 
                         timings.push_back(t_stop - t_start);
@@ -222,12 +224,14 @@ public:
 
 int main(int argc, char *argv[])
 {
-        const option long_options[] = {{"help", no_argument, nullptr, 'h'},
-                                       {"fmessages", required_argument, nullptr, 'm'},
-                                       {"foutput", required_argument, nullptr, 'o'},
-                                       {"timeout", required_argument, nullptr, 't'},
-                                       {"verbose", no_argument, nullptr, 'v'},
-                                       {nullptr, 0, nullptr, 0}};
+        const option long_options[] = {
+                        {"help", no_argument, nullptr, 'h'},
+                        {"fmessages", required_argument, nullptr, 'm'},
+                        {"foutput", required_argument, nullptr, 'o'},
+                        {"timeout", required_argument, nullptr, 't'},
+                        {"verbose", no_argument, nullptr, 'v'},
+                        {nullptr, 0, nullptr, 0}
+        };
 
         std::string fmessages = "default_messages.txt";
         std::string foutput = "default_output.txt";
@@ -240,7 +244,7 @@ int main(int argc, char *argv[])
                 switch (opt) {
                 case 'h':
                         // clang-format off
-                        std::cout << "Help: This program runs a MPI gatherv\n"
+                        std::cout << "Help: This program runs a MPI bcast .\n"
                                   << "Options:\n"
                                   << "  -h, --help            Show this help message\n"
                                   << "  -m, --fmessages FILE  Specify file with messages (default: default_messages.txt)\n"
@@ -270,7 +274,7 @@ int main(int argc, char *argv[])
 
         MPI_Init(&argc, &argv);
         try {
-                Gatherv benchmark;
+                Alltoallw benchmark;
                 benchmark.run(fmessages, timeout, verbose);
                 benchmark.save_latencies(foutput, verbose);
         } catch (const std::exception &e) {

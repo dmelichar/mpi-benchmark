@@ -50,10 +50,10 @@ class Scatterv {
                         if (row.size() != csize) {
                                 // clang-format off
                                 std::cerr << "ERROR: Number of columns "
-                                          << "(" << row.size() << ")"
-                                          << "does not match number of processes "
-                                          << "(" << csize << ")."
-                                          << std::endl;
+                                                << "(" << row.size() << ")"
+                                                << "does not match number of processes "
+                                                << "(" << csize << ")."
+                                                << std::endl;
                                 // clang-format on
                                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
                         }
@@ -79,7 +79,7 @@ class Scatterv {
                 MPI_Barrier(MPI_COMM_WORLD);
         }
 
-      public:
+public:
         Scatterv()
         {
                 MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -98,10 +98,10 @@ class Scatterv {
                 if (rank == 0 && verbose) {
                         // clang-format off
                         std::cout << std::left << std::setw(25) << "Messages (count)"
-                                               << std::setw(25) << "Avg Latency (s)"
-                                               << std::setw(25) << "Min Latency (s)"
-                                               << std::setw(25) << "Max Latency (s)"
-                                  << std::endl;
+                                        << std::setw(25) << "Avg Latency (s)"
+                                        << std::setw(25) << "Min Latency (s)"
+                                        << std::setw(25) << "Max Latency (s)"
+                                        << std::endl;
                         // clang-format on
                 }
 
@@ -152,11 +152,11 @@ class Scatterv {
                 if (rank == 0 && verbose) {
                         // clang-format off
                         std::cout << std::left
-                                  << std::setw(25) << sbuffer.size()
-                                  << std::setw(25) << avg_time
-                                  << std::setw(25) << min_time
-                                  << std::setw(25) << max_time
-                                  << std::endl;
+                                        << std::setw(25) << sbuffer.size()
+                                        << std::setw(25) << avg_time
+                                        << std::setw(25) << min_time
+                                        << std::setw(25) << max_time
+                                        << std::endl;
                         // clang-format on
                 }
         }
@@ -239,14 +239,15 @@ int main(int argc, char *argv[])
         while ((opt = getopt_long(argc, argv, "hm:o:n:t:v", long_options, nullptr)) != -1) {
                 switch (opt) {
                 case 'h':
-                        std::cout
-                            << "Help: This program runs a MPI bcast .\n"
-                            << "Options:\n"
-                            << "  -h, --help            Show this help message\n"
-                            << "  -m, --fmessages FILE  Specify file with messages (default: default_messages.txt)\n"
-                            << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
-                            << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
-                            << "  -v, --verbose         Enable verbose mode\n";
+                        // clang-format off
+                        std::cout << "Help: This program runs a MPI scatterv\n"
+                                  << "Options:\n"
+                                  << "  -h, --help            Show this help message\n"
+                                  << "  -m, --fmessages FILE  Specify file with messages (default: default_messages.txt)\n"
+                                  << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
+                                  << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
+                                  << "  -v, --verbose         Enable verbose mode\n";
+                        // clang-format on
                         return EXIT_SUCCESS;
                 case 'm':
                         fmessages = optarg;

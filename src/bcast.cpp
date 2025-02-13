@@ -31,7 +31,7 @@ class Bcast {
                 }
         }
 
-      public:
+public:
         Bcast()
         {
                 MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -56,11 +56,12 @@ class Bcast {
 
                 if (rank == 0 && verbose) {
                         // clang-format off
-                        std::cout << std::left << std::setw(25) << "Size (Bytes)" 
-                                               << std::setw(25) << "Avg Latency (μs)"
-                                               << std::setw(25) << "Min Latency (μs)"
-                                               << std::setw(25) << "Max Latency (μs)"
-                                  << std::endl;
+                        std::cout << std::left
+                                        << std::setw(25) << "Size (Bytes)"
+                                        << std::setw(25) << "Avg Latency (μs)"
+                                        << std::setw(25) << "Min Latency (μs)"
+                                        << std::setw(25) << "Max Latency (μs)"
+                                        << std::endl;
                         // clang-format on
                 }
 
@@ -113,11 +114,11 @@ class Bcast {
                 if (rank == 0 && verbose) {
                         // clang-format off
                         std::cout << std::left
-                                  << std::setw(25) << msg_size
-                                  << std::setw(25) << avg_time
-                                  << std::setw(25) << min_time
-                                  << std::setw(25) << max_time
-                        << std::endl;
+                                        << std::setw(25) << msg_size
+                                        << std::setw(25) << avg_time
+                                        << std::setw(25) << min_time
+                                        << std::setw(25) << max_time
+                                        << std::endl;
                         // clang-format on
                 }
 
@@ -197,14 +198,15 @@ int main(int argc, char *argv[])
         while ((opt = getopt_long(argc, argv, "hm:o:n:t:v", long_options, nullptr)) != -1) {
                 switch (opt) {
                 case 'h':
-                        std::cout
-                            << "Help: This program runs a MPI bcast .\n"
-                            << "Options:\n"
-                            << "  -h, --help            Show this help message\n"
-                            << "  -m, --fmessages FILE  NOT IMPLEMENTED\n"
-                            << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
-                            << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
-                            << "  -v, --verbose         Enable verbose mode\n";
+                        // clang-format off
+                        std::cout << "Help: This program runs a MPI bcast\n"
+                                  << "Options:\n"
+                                  << "  -h, --help            Show this help message\n"
+                                  << "  -m, --fmessages FILE  Specify file with messages (default: default_messages.txt)\n"
+                                  << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
+                                  << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
+                                  << "  -v, --verbose         Enable verbose mode\n";
+                        // clang-format on
                         return EXIT_SUCCESS;
                 case 'm':
                         // Not implemented
