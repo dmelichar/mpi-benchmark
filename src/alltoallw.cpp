@@ -225,13 +225,13 @@ public:
 
                 MPI_Barrier(MPI_COMM_WORLD);
                 // @formatter:off
-                std::ostringstream oss;
-                oss << std::left
-                    << std::setw(25) << "Rank " + std::to_string(rank)
-                    << std::setw(25) << avg_local * 1e6
-                    << std::setw(25) << min_local * 1e6
-                    << std::setw(25) << max_local * 1e6;
-                std::cout << oss.str() << std::endl;
+                // std::ostringstream oss;
+                // oss << std::left
+                //     << std::setw(25) << "Rank " + std::to_string(rank)
+                //     << std::setw(25) << avg_local * 1e6
+                //     << std::setw(25) << min_local * 1e6
+                //     << std::setw(25) << max_local * 1e6;
+                // std::cout << oss.str() << std::endl;
                 // @formatter:on
 
         }
