@@ -115,11 +115,11 @@ public:
                 if (rank == 0 && verbose) {
                         // @formatter:off
                         std::cout << std::left
-                                        << std::setw(25) << msg_size
-                                        << std::setw(25) << avg_time
-                                        << std::setw(25) << min_time
-                                        << std::setw(25) << max_time
-                                        << std::endl;
+                                  << std::setw(25) << msg_size
+                                  << std::setw(25) << avg_time
+                                  << std::setw(25) << min_time
+                                  << std::setw(25) << max_time
+                                  << std::endl;
                         // @formatter:on
                 }
 
