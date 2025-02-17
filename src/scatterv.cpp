@@ -8,6 +8,7 @@
 #include <numeric>
 #include <sstream>
 #include <vector>
+#include <format>
 
 #include <mpi.h>
 
