@@ -24,8 +24,8 @@ class Scatterv {
         // Prepare messages
         void setup(const std::string &filename)
         {
-                sendcounts.resize(csize);
-                displs.resize(csize);
+                sendcounts.resize(csize, 0);
+                displs.resize(csize, 0);
 
                 if (rank == 0) {
                         std::ifstream file(filename);
@@ -46,11 +46,12 @@ class Scatterv {
                         while (std::getline(ss, val, ',')) {
                                 row.push_back(std::stoi(val));
                         }
+                        file.close();
 
                         if (row.size() != csize) {
                                 // clang-format off
                                 std::cerr << "ERROR: Number of columns "
-                                                << "(" << row.size() << ")"
+                                                << "(" << row.size() << ") "
                                                 << "does not match number of processes "
                                                 << "(" << csize << ")."
                                                 << std::endl;
@@ -67,15 +68,15 @@ class Scatterv {
                         }
 
                         sendcounts = row;
-                        displs.assign(row.size(), 0);
-                        for (int i = 1; i < row.size(); ++i) {
-                                displs[i] = displs[i - 1] + sendcounts[i - 1];
-                        }
                 }
 
                 MPI_Bcast(sendcounts.data(), csize, MPI_INT, 0, MPI_COMM_WORLD);
-                MPI_Bcast(displs.data(), csize, MPI_INT, 0, MPI_COMM_WORLD);
                 rbuffer.resize(sendcounts[rank]);
+
+                for (int i = 1; i < csize; ++i) {
+                        displs[i] = displs[i - 1] + sendcounts[i - 1];
+                }
+
                 MPI_Barrier(MPI_COMM_WORLD);
         }
 
@@ -97,10 +98,11 @@ public:
 
                 if (rank == 0 && verbose) {
                         // clang-format off
-                        std::cout << std::left << std::setw(25) << "Messages (count)"
-                                        << std::setw(25) << "Avg Latency (s)"
-                                        << std::setw(25) << "Min Latency (s)"
-                                        << std::setw(25) << "Max Latency (s)"
+                        std::cout << std::left
+                                        << std::setw(25) << "Messages (count)"
+                                        << std::setw(25) << "Avg Latency (μs)"
+                                        << std::setw(25) << "Min Latency (μs)"
+                                        << std::setw(25) << "Max Latency (μs)"
                                         << std::endl;
                         // clang-format on
                 }
@@ -114,7 +116,6 @@ public:
 
                 // TODO This could probably be improved
                 while (true) {
-                        // unsigned long iter = 0;
                         const double t_start = MPI_Wtime();
                         MPI_Scatterv(sbuffer.data(),
                                      sendcounts.data(),
@@ -141,24 +142,38 @@ public:
                 }
                 MPI_Barrier(MPI_COMM_WORLD);
 
-                double min_time = 0.0, max_time = 0.0, avg_time = 0.0;
+                const double min_local = *std::ranges::min_element(timings);
+                const double max_local = *std::ranges::max_element(timings);
+                const double avg_local = std::accumulate(timings.begin(), timings.end(), 0.0) / timings.size();
 
-                // Reduce operations to get min, max, and average times
-                MPI_Reduce(&timings, &min_time, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
-                MPI_Reduce(&timings, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-                MPI_Reduce(&timings, &avg_time, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+                double min_time = 0.0, max_time = 0.0, avg_time = 0.0;
+                MPI_Reduce(&min_local, &min_time, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
+                MPI_Reduce(&max_local, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+                MPI_Reduce(&avg_local, &avg_time, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
                 avg_time /= csize;
 
                 if (rank == 0 && verbose) {
-                        // clang-format off
+                        // @formatter:off
                         std::cout << std::left
-                                        << std::setw(25) << sbuffer.size()
-                                        << std::setw(25) << avg_time
-                                        << std::setw(25) << min_time
-                                        << std::setw(25) << max_time
-                                        << std::endl;
-                        // clang-format on
+                                  << std::setw(25) << sbuffer.size()
+                                  << std::setw(25) << avg_time * 1e6
+                                  << std::setw(25) << min_time * 1e6
+                                  << std::setw(25) << max_time * 1e6
+                                  << std::endl
+                                  << std::endl;
+                        // @formatter:on
                 }
+
+                MPI_Barrier(MPI_COMM_WORLD);
+                // clang-format off
+                std::cout << std::left
+                          << std::setw(25) << std::format("Rank {}", rank)
+                          << std::setw(25) << avg_local * 1e6
+                          << std::setw(25) << min_local * 1e6
+                          << std::setw(25) << max_local * 1e6
+                          << std::endl;
+                // clang-format on
+
         }
 
         // Save data to file
@@ -241,13 +256,13 @@ int main(int argc, char *argv[])
                 case 'h':
                         // clang-format off
                         std::cout << "Help: This program runs a MPI scatterv\n"
-                                  << "Options:\n"
-                                  << "  -h, --help            Show this help message\n"
-                                  << "  -m, --fmessages FILE  Specify file with messages (default: default_messages.txt)\n"
-                                  << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
-                                  << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
-                                  << "  -v, --verbose         Enable verbose mode\n";
-                        // clang-format on
+                                        << "Options:\n"
+                                        << "  -h, --help            Show this help message\n"
+                                        << "  -m, --fmessages FILE  Specify file with messages (default: default_messages.txt)\n"
+                                        << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
+                                        << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
+                                        << "  -v, --verbose         Enable verbose mode\n";
+                // clang-format on
                         return EXIT_SUCCESS;
                 case 'm':
                         fmessages = optarg;

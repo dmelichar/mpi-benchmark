@@ -23,7 +23,7 @@ class Bcast {
         void setup(const size_t msg_size)
         {
                 try {
-                        buffer.resize(msg_size);
+                        buffer.resize(msg_size, 0);
                         std::ranges::fill(buffer, 0);
                 } catch (const std::bad_alloc &e) {
                         std::cerr << "Could not allocate memory [rank " << rank << "]: " << e.what() << std::endl;

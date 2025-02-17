@@ -8,74 +8,132 @@
 #include <sstream>
 #include <vector>
 #include <iomanip>
+#include <any>
 
 #include <mpi.h>
 
 class Alltoallw {
         int rank{};
         int csize{};
-        std::vector<double> sbuffer;
-        std::vector<double> rbuffer;
+        std::vector<std::any> sbuffer;
+        std::vector<std::any> rbuffer;
         std::vector<double> timings;
         std::vector<int> displs;
         std::vector<int> sendcounts;
+        std::vector<int> recvcounts;
         std::vector<MPI_Datatype> sendtypes;
 
         // Prepare messages
         void setup(const std::string &filename)
         {
-                sendcounts.resize(csize);
-                displs.resize(csize);
+                sendcounts.resize(csize, 0);
+                recvcounts.resize(csize, 0);
+                displs.resize(csize, 0);
+                sendtypes.resize(csize, MPI_INT);
 
                 if (rank == 0) {
+                        std::vector rows(csize, std::vector<int>(csize));
+                        std::vector columns(csize, std::vector<int>(csize));
+
                         std::ifstream file(filename);
                         if (!file) {
                                 std::cerr << "ERROR: Could not open file " << filename << std::endl;
                                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
                         }
 
+                        size_t prc = 0;
                         std::string line;
-                        if (!std::getline(file, line)) {
-                                std::cerr << "ERROR: Could not read line " << filename << std::endl;
+                        while (std::getline(file, line)) {
+                                std::istringstream ss(line);
+                                std::vector row(csize, 0);
+                                std::string val;
+
+                                size_t idx = 0;
+                                while (std::getline(ss, val, ',')) {
+                                        row[idx] = std::stoi(val);
+                                        idx++;
+                                        if (idx > csize) {
+                                                // @formatter:off
+                                                std::cerr << "ERROR: Number of columns "
+                                                          << "(" << idx << ") "
+                                                          << "does not match number of processes "
+                                                          << "(" << csize << ")."
+                                                          << std::endl;
+                                                MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+                                                // @formatter:on
+                                        }
+                                }
+
+                                if (idx < csize) {
+                                        // @formatter:off
+                                        std::cerr << "ERROR: Number of columns "
+                                                  << "(" << idx << ") "
+                                                  << "does not match number of processes "
+                                                  << "(" << csize << ")."
+                                                  << std::endl;
+                                        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+                                        // @formatter:on
+                                }
+
+                                rows[prc] = row;
+                                for (size_t i = 0; i < csize; ++i) {
+                                        columns[i][prc] = row[i];
+                                }
+
+                                prc++;
+                                if (prc > csize) {
+                                        std::cerr << "ERROR: Too many lines in file " << std::endl;
+                                        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+                                }
+                        }
+
+                        if (prc != csize) {
+                                std::cerr << "ERROR: Not enough lines in file " << std::endl;
                                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
                         }
 
-                        std::istringstream ss(line);
-                        std::vector<int> row;
-                        std::string val;
-                        while (std::getline(ss, val, ',')) {
-                                row.push_back(std::stoi(val));
+                        file.close();
+
+                        for (int i = 0; i < csize; ++i) {
+                                MPI_Send(rows[i].data(), csize, MPI_INT, i, 0, MPI_COMM_WORLD);
+                                MPI_Send(columns[i].data(), csize, MPI_INT, i, 0, MPI_COMM_WORLD);
                         }
 
-                        if (row.size() != csize) {
-                                // clang-format off
-                                std::cerr << "ERROR: Number of columns "
-                                                << "(" << row.size() << ")"
-                                                << "does not match number of processes "
-                                                << "(" << csize << ")."
-                                                << std::endl;
-                                // clang-format on
-                                MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-                        }
+                } else {
+                        MPI_Recv(sendcounts.data(), csize, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                        MPI_Recv(recvcounts.data(), csize, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                }
 
-                        sendcounts = row;
-                        displs.assign(row.size(), 0);
-                        for (int i = 1; i < row.size(); ++i) {
-                                displs[i] = displs[i - 1] + sendcounts[i - 1];
+                for (int i = 0; i < csize; ++i) {
+                        switch (i % 3) {
+                        case 0:
+                                sendtypes[i] = MPI_CHAR;
+                                break;
+                        case 1:
+                                sendtypes[i] = MPI_INT;
+                                break;
+                        case 2:
+                                sendtypes[i] = MPI_DOUBLE;
+                                break;
+                        default:
+                                sendtypes[i] = MPI_INT;
+                                break;
                         }
                 }
 
-                // TODO: Consider just sending sendcounts[rank] to each process
-                MPI_Bcast(sendcounts.data(), csize, MPI_INT, 0, MPI_COMM_WORLD);
-                MPI_Bcast(displs.data(), csize, MPI_INT, 0, MPI_COMM_WORLD);
-
-                sbuffer.resize(sendcounts[rank]);
-                for (auto i = 0; i < sendcounts[rank]; ++i) {
-                        // TODO Need cast to double of rank
-                        sbuffer[i] = rank;
+                sbuffer.resize(std::accumulate(sendcounts.begin(), sendcounts.end(), 0));
+                int value = 1, offset = 0;
+                for (int i : sendcounts) {
+                        std::fill_n(sbuffer.begin() + offset, i, value);
+                        offset += i;
+                        ++value;
                 }
 
-                rbuffer.resize(std::accumulate(sendcounts.begin(), sendcounts.end(), 0));
+                rbuffer.resize(std::accumulate(recvcounts.begin(), recvcounts.end(), 0));
+
+                for (int i = 1; i < csize; ++i) {
+                        displs[i] = displs[i - 1] + sendcounts[i - 1];
+                }
 
                 MPI_Barrier(MPI_COMM_WORLD);
         }
@@ -97,14 +155,14 @@ public:
                 setup(filename);
 
                 if (rank == 0 && verbose) {
-                        // clang-format off
+                        // @formatter:off
                         std::cout << std::left
-                                        << std::setw(25) << "Messages (count)"
-                                        << std::setw(25) << "Avg Latency (s)"
-                                        << std::setw(25) << "Min Latency (s)"
-                                        << std::setw(25) << "Max Latency (s)"
-                                        << std::endl;
-                        // clang-format on
+                                  << std::setw(25) << "Messages (count)"
+                                  << std::setw(25) << "Avg Latency (s)"
+                                  << std::setw(25) << "Min Latency (s)"
+                                  << std::setw(25) << "Max Latency (s)"
+                                  << std::endl;
+                        // @formatter:on
                 }
 
                 // Global clock
@@ -122,11 +180,10 @@ public:
                                       displs.data(),
                                       sendtypes.data(),
                                       rbuffer.data(),
-                                      sendcounts.data(),
+                                      recvcounts.data(),
                                       displs.data(),
                                       sendtypes.data(),
-                                      MPI_COMM_WORLD
-                                        );
+                                      MPI_COMM_WORLD);
                         const double t_stop = MPI_Wtime();
 
                         timings.push_back(t_stop - t_start);
@@ -143,24 +200,38 @@ public:
                 }
                 MPI_Barrier(MPI_COMM_WORLD);
 
-                double min_time = 0.0, max_time = 0.0, avg_time = 0.0;
+                const double min_local = *std::ranges::min_element(timings);
+                const double max_local = *std::ranges::max_element(timings);
+                const double avg_local = std::accumulate(timings.begin(), timings.end(), 0.0) / timings.size();
 
-                // Reduce operations to get min, max, and average times
-                MPI_Reduce(&timings, &min_time, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
-                MPI_Reduce(&timings, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-                MPI_Reduce(&timings, &avg_time, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+                double min_time = 0.0, max_time = 0.0, avg_time = 0.0;
+                MPI_Reduce(&min_local, &min_time, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
+                MPI_Reduce(&max_local, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+                MPI_Reduce(&avg_local, &avg_time, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
                 avg_time /= csize;
 
                 if (rank == 0 && verbose) {
-                        // clang-format off
+                        // @formatter:off
                         std::cout << std::left
-                                        << std::setw(25) << rbuffer.size()
-                                        << std::setw(25) << avg_time
-                                        << std::setw(25) << min_time
-                                        << std::setw(25) << max_time
-                                        << std::endl;
-                        // clang-format on
+                                  << std::setw(25) << sbuffer.size()
+                                  << std::setw(25) << avg_time * 1e6
+                                  << std::setw(25) << min_time * 1e6
+                                  << std::setw(25) << max_time * 1e6
+                                  << std::endl
+                                  << std::endl;
+                        // @formatter:on
                 }
+
+                MPI_Barrier(MPI_COMM_WORLD);
+                // @formatter:off
+                std::cout << std::left
+                          << std::setw(25) << std::format("Rank {}", rank)
+                          << std::setw(25) << avg_local * 1e6
+                          << std::setw(25) << min_local * 1e6
+                          << std::setw(25) << max_local * 1e6
+                          << std::endl;
+                // @formatter:on
+
         }
 
         // Save data to file
@@ -244,14 +315,14 @@ int main(int argc, char *argv[])
                 switch (opt) {
                 case 'h':
                         // clang-format off
-                        std::cout << "Help: This program runs a MPI bcast .\n"
-                                  << "Options:\n"
-                                  << "  -h, --help            Show this help message\n"
-                                  << "  -m, --fmessages FILE  Specify file with messages (default: default_messages.txt)\n"
-                                  << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
-                                  << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
-                                  << "  -v, --verbose         Enable verbose mode\n";
-                        // clang-format on
+                        std::cout << "Help: This program runs a MPI alltoallw\n"
+                                        << "Options:\n"
+                                        << "  -h, --help            Show this help message\n"
+                                        << "  -m, --fmessages FILE  Specify file with messages (default: default_messages.txt)\n"
+                                        << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
+                                        << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
+                                        << "  -v, --verbose         Enable verbose mode\n";
+                // clang-format on
                         return EXIT_SUCCESS;
                 case 'm':
                         fmessages = optarg;
