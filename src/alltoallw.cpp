@@ -9,7 +9,7 @@
 #include <vector>
 #include <iomanip>
 #include <any>
-#include <format>
+
 
 #include <mpi.h>
 
@@ -315,7 +315,7 @@ int main(int argc, char *argv[])
         while ((opt = getopt_long(argc, argv, "hm:o:n:t:v", long_options, nullptr)) != -1) {
                 switch (opt) {
                 case 'h':
-                        // clang-format off
+                        // @formatter:off
                         std::cout << "Help: This program runs a MPI alltoallw\n"
                                         << "Options:\n"
                                         << "  -h, --help            Show this help message\n"
@@ -323,7 +323,7 @@ int main(int argc, char *argv[])
                                         << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
                                         << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
                                         << "  -v, --verbose         Enable verbose mode\n";
-                // clang-format on
+                // @formatter:on
                         return EXIT_SUCCESS;
                 case 'm':
                         fmessages = optarg;

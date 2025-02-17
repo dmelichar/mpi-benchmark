@@ -8,7 +8,6 @@
 #include <numeric>
 #include <sstream>
 #include <vector>
-#include <format>
 
 #include <mpi.h>
 
@@ -50,13 +49,13 @@ class Scatterv {
                         file.close();
 
                         if (row.size() != csize) {
-                                // clang-format off
+                                // @formatter:off
                                 std::cerr << "ERROR: Number of columns "
                                                 << "(" << row.size() << ") "
                                                 << "does not match number of processes "
                                                 << "(" << csize << ")."
                                                 << std::endl;
-                                // clang-format on
+                                // @formatter:on
                                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
                         }
 
@@ -98,14 +97,14 @@ public:
                 setup(filename);
 
                 if (rank == 0 && verbose) {
-                        // clang-format off
+                        // @formatter:off
                         std::cout << std::left
                                         << std::setw(25) << "Messages (count)"
                                         << std::setw(25) << "Avg Latency (μs)"
                                         << std::setw(25) << "Min Latency (μs)"
                                         << std::setw(25) << "Max Latency (μs)"
                                         << std::endl;
-                        // clang-format on
+                        // @formatter:on
                 }
 
                 // Global clock
@@ -166,14 +165,15 @@ public:
                 }
 
                 MPI_Barrier(MPI_COMM_WORLD);
-                // clang-format off
-                std::cout << std::left
-                          << std::setw(25) << std::format("Rank {}", rank)
-                          << std::setw(25) << avg_local * 1e6
-                          << std::setw(25) << min_local * 1e6
-                          << std::setw(25) << max_local * 1e6
-                          << std::endl;
-                // clang-format on
+                // @formatter:off
+                std::ostringstream oss;
+                oss << std::left
+                    << std::setw(25) << "Rank " + std::to_string(rank)
+                    << std::setw(25) << avg_local * 1e6
+                    << std::setw(25) << min_local * 1e6
+                    << std::setw(25) << max_local * 1e6;
+                std::cout << oss.str() << std::endl;
+                // @formatter:on
 
         }
 
@@ -255,7 +255,7 @@ int main(int argc, char *argv[])
         while ((opt = getopt_long(argc, argv, "hm:o:n:t:v", long_options, nullptr)) != -1) {
                 switch (opt) {
                 case 'h':
-                        // clang-format off
+                        // @formatter:off
                         std::cout << "Help: This program runs a MPI scatterv\n"
                                         << "Options:\n"
                                         << "  -h, --help            Show this help message\n"
@@ -263,7 +263,7 @@ int main(int argc, char *argv[])
                                         << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
                                         << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
                                         << "  -v, --verbose         Enable verbose mode\n";
-                // clang-format on
+                // @formatter:on
                         return EXIT_SUCCESS;
                 case 'm':
                         fmessages = optarg;

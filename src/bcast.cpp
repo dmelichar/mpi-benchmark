@@ -7,7 +7,7 @@
 #include <numeric>
 #include <vector>
 #include <iomanip>
-#include <format>
+
 
 #include <mpi.h>
 
@@ -56,14 +56,14 @@ public:
                 }
 
                 if (rank == 0 && verbose) {
-                        // clang-format off
+                        // @formatter:off
                         std::cout << std::left
                                         << std::setw(25) << "Size (Bytes)"
                                         << std::setw(25) << "Avg Latency (μs)"
                                         << std::setw(25) << "Min Latency (μs)"
                                         << std::setw(25) << "Max Latency (μs)"
                                         << std::endl;
-                        // clang-format on
+                        // @formatter:on
                 }
 
                 double timer = 0.0;
@@ -113,14 +113,14 @@ public:
                 avg_time /= csize;
 
                 if (rank == 0 && verbose) {
-                        // clang-format off
+                        // @formatter:off
                         std::cout << std::left
                                         << std::setw(25) << msg_size
                                         << std::setw(25) << avg_time
                                         << std::setw(25) << min_time
                                         << std::setw(25) << max_time
                                         << std::endl;
-                        // clang-format on
+                        // @formatter:on
                 }
 
         }
@@ -199,7 +199,7 @@ int main(int argc, char *argv[])
         while ((opt = getopt_long(argc, argv, "hm:o:n:t:v", long_options, nullptr)) != -1) {
                 switch (opt) {
                 case 'h':
-                        // clang-format off
+                        // @formatter:off
                         std::cout << "Help: This program runs a MPI bcast\n"
                                   << "Options:\n"
                                   << "  -h, --help            Show this help message\n"
@@ -207,7 +207,7 @@ int main(int argc, char *argv[])
                                   << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
                                   << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
                                   << "  -v, --verbose         Enable verbose mode\n";
-                        // clang-format on
+                        // @formatter:on
                         return EXIT_SUCCESS;
                 case 'm':
                         // Not implemented
