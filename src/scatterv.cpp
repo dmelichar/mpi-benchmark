@@ -17,9 +17,10 @@ class Scatterv {
         int csize{};
         std::vector<double> sbuffer;
         std::vector<double> rbuffer;
-        std::vector<double> timings;
         std::vector<int> displs;
         std::vector<int> sendcounts;
+        std::vector<double> starts;
+        std::vector<double> ends;
 
         // Prepare messages
         void setup(const std::string &filename)
@@ -51,10 +52,10 @@ class Scatterv {
                         if (row.size() != csize) {
                                 // @formatter:off
                                 std::cerr << "ERROR: Number of columns "
-                                                << "(" << row.size() << ") "
-                                                << "does not match number of processes "
-                                                << "(" << csize << ")."
-                                                << std::endl;
+                                          << "(" << row.size() << ") "
+                                          << "does not match number of processes "
+                                          << "(" << csize << ")."
+                                          << std::endl;
                                 // @formatter:on
                                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
                         }
@@ -76,8 +77,6 @@ class Scatterv {
                 for (int i = 1; i < csize; ++i) {
                         displs[i] = displs[i - 1] + sendcounts[i - 1];
                 }
-
-                MPI_Barrier(MPI_COMM_WORLD);
         }
 
 public:
@@ -96,17 +95,6 @@ public:
         {
                 setup(filename);
 
-                if (rank == 0 && verbose) {
-                        // @formatter:off
-                        std::cout << std::left
-                                        << std::setw(25) << "Messages (count)"
-                                        << std::setw(25) << "Avg Latency (μs)"
-                                        << std::setw(25) << "Min Latency (μs)"
-                                        << std::setw(25) << "Max Latency (μs)"
-                                        << std::endl;
-                        // @formatter:on
-                }
-
                 // Global clock
                 double global_start_time = 0.0;
                 if (rank == 0) {
@@ -114,7 +102,7 @@ public:
                 }
                 MPI_Bcast(&global_start_time, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-                // TODO This could probably be improved
+                MPI_Barrier(MPI_COMM_WORLD);
                 while (true) {
                         const double t_start = MPI_Wtime();
                         MPI_Scatterv(sbuffer.data(),
@@ -128,9 +116,10 @@ public:
                                      MPI_COMM_WORLD);
                         const double t_stop = MPI_Wtime();
 
-                        timings.push_back(t_stop - t_start);
-                        MPI_Barrier(MPI_COMM_WORLD);
+                        starts.push_back(t_start);
+                        ends.push_back(t_stop);
 
+                        MPI_Barrier(MPI_COMM_WORLD);
                         bool continue_loop = true;
                         if (rank == 0) {
                                 const double elapsed_time = MPI_Wtime() - global_start_time;
@@ -142,50 +131,161 @@ public:
                 }
                 MPI_Barrier(MPI_COMM_WORLD);
 
-                const double min_local = *std::ranges::min_element(timings);
-                const double max_local = *std::ranges::max_element(timings);
-                const double avg_local = std::accumulate(timings.begin(), timings.end(), 0.0) / timings.size();
+                std::vector<int> call_starts(csize);
+                std::vector<int> call_ends(csize);
+                const int starts_size = static_cast<int>(starts.size());
+                const int ends_size = static_cast<int>(ends.size());
+                MPI_Gather(&starts_size, 1, MPI_INT, call_starts.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
+                MPI_Gather(&ends_size, 1, MPI_INT, call_ends.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-                double min_time = 0.0, max_time = 0.0, avg_time = 0.0;
-                MPI_Reduce(&min_local, &min_time, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
-                MPI_Reduce(&max_local, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-                MPI_Reduce(&avg_local, &avg_time, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-                avg_time /= csize;
+                if (rank == 0) {
+                        if (!std::ranges::all_of(call_starts.begin(),
+                                                 call_starts.end(),
+                                                 [&](const int x) { return x == call_starts[0]; })) {
+                                std::cerr << "ERROR: Timing buffers mismatch." << std::endl;
+                                MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+                        }
+                        if (!std::ranges::all_of(call_ends.begin(),
+                                                 call_ends.end(),
+                                                 [&](const int x) { return x == call_ends[0]; })) {
+                                std::cerr << "ERROR: Timing buffers mismatch." << std::endl;
+                                MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+                        }
+                }
+                const int iter = call_starts[0];
 
-                if (rank == 0 && verbose) {
-                        // @formatter:off
-                        std::cout << std::left
-                                  << std::setw(25) << sbuffer.size()
-                                  << std::setw(25) << avg_time * 1e6
-                                  << std::setw(25) << min_time * 1e6
-                                  << std::setw(25) << max_time * 1e6
-                                  << std::endl
-                                  << std::endl;
-                        // @formatter:on
+                // call_starts/ends should be the number of iterations of each process, i.e. each p should have
+                // the call_starts/ends = [niterations]*csize
+                std::vector<double> all_starts;
+                std::vector<double> all_ends;
+                int sum;
+                if (rank == 0) {
+                        sum = std::accumulate(call_starts.begin(), call_starts.end(), 0);
+                        if (sum != std::accumulate(call_ends.begin(), call_ends.end(), 0)) {
+                                std::cerr << "ERROR: Timing buffers mismatch." << std::endl;
+                                MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+                        }
+                        all_starts.resize(sum);
+                        all_ends.resize(sum);
+                }
+
+                MPI_Gather(starts.data(),
+                           starts_size,
+                           MPI_DOUBLE,
+                           all_starts.data(),
+                           starts_size,
+                           MPI_DOUBLE,
+                           0,
+                           MPI_COMM_WORLD);
+                MPI_Gather(ends.data(),
+                           ends_size,
+                           MPI_DOUBLE,
+                           all_ends.data(),
+                           ends_size,
+                           MPI_DOUBLE,
+                           0,
+                           MPI_COMM_WORLD);
+
+                if (rank == 0) {
+                        std::vector<double> latencies(sum);
+                        std::transform(all_ends.begin(),
+                                       all_ends.end(),
+                                       all_starts.begin(),
+                                       latencies.begin(),
+                                       std::minus());
+
+                        // Compute local min, max, average for each p (i.e. for each process' time)
+                        std::vector<double> min_local(csize);
+                        std::vector<double> max_local(csize);
+                        std::vector<double> avg_local(csize);
+                        for (int i = 0; i < csize; ++i) {
+                                std::vector<double> local(iter);
+                                for (int j = 0; j < iter; ++j) {
+                                        local[j] = latencies[j + i * iter];
+                                }
+                                min_local[i] = *std::ranges::min_element(local);
+                                max_local[i] = *std::ranges::max_element(local);
+                                avg_local[i] = std::accumulate(local.begin(), local.end(), 0.0) / iter;
+                        }
+
+                        // Output local
+                        if (verbose) {
+                                // @formatter:off
+                                std::ostringstream oss;
+                                oss << std::left
+                                    << std::setw(25) << ""
+                                    << std::setw(25) << "Avg Latency (μs)"
+                                    << std::setw(25) << "Min Latency (μs)"
+                                    << std::setw(25) << "Max Latency (μs)"
+                                    << std::endl;
+                                for (int i = 0; i < csize; ++i) {
+                                        oss << std::left
+                                            << std::setw(25) << "Rank " + std::to_string(i)
+                                            << std::setw(25) << avg_local[i] * 1e6
+                                            << std::setw(25) << min_local[i] * 1e6
+                                            << std::setw(25) << max_local[i] * 1e6
+                                            << std::endl;
+
+                                }
+                                std::cout << oss.str() << std::endl;
+                                // @formatter: on
+                        }
+
+                        // Compute global min, max, average by iteration over all processes
+                        std::vector<double> min_global(iter);
+                        std::vector<double> max_global(iter);
+                        std::vector<double> avg_global(iter);
+                        for (int i = 0; i < iter; ++i) {
+                                std::vector<double> it(csize);
+                                for (int j = 0; j < csize; ++j) {
+                                        it[j] = latencies[i + j * csize];
+                                }
+                                min_global[i] = *std::ranges::min_element(it);
+                                max_global[i] = *std::ranges::max_element(it);
+                                avg_global[i] = std::accumulate(it.begin(), it.end(), 0.0) / csize;
+                        }
+
+
+                        // Output global
+                        if (verbose) {
+                                double vmin_global = *std::ranges::min_element(min_global);
+                                double vmax_global = *std::ranges::max_element(max_global);
+                                double vavg_global = std::accumulate(avg_global.begin(), avg_global.end(), 0.0) / iter;
+
+                                // @formatter:off
+                                std::ostringstream oss;
+                                oss << std::left
+                                    << std::setw(25) << "Global messages count"
+                                    << std::setw(25) << "Avg Latency (μs)"
+                                    << std::setw(25) << "Min Latency (μs)"
+                                    << std::setw(25) << "Max Latency (μs)"
+                                    << std::setw(25) << "Iterations"
+                                    << std::endl
+                                    << std::setw(25) << sbuffer.size()
+                                    << std::setw(25) << vavg_global * 1e6
+                                    << std::setw(25) << vmin_global * 1e6
+                                    << std::setw(25) << vmax_global * 1e6
+                                    << std::setw(25) << iter
+                                    << std::endl
+                                    << std::endl;
+                                std::cout << oss.str() << std::endl;
+                                // @formatter:on
+                        }
                 }
 
                 MPI_Barrier(MPI_COMM_WORLD);
-                // @formatter:off
-                // std::ostringstream oss;
-                // oss << std::left
-                //     << std::setw(25) << "Rank " + std::to_string(rank)
-                //     << std::setw(25) << avg_local * 1e6
-                //     << std::setw(25) << min_local * 1e6
-                //     << std::setw(25) << max_local * 1e6;
-                // std::cout << oss.str() << std::endl;
-                // @formatter:on
-
         }
 
         // Save data to file
-        // TODO Needs improvement. Big file size too. If NFS, could use MPI_FILE
         void save_latencies(const std::string &filename, const bool verbose = false) const
         {
-                const size_t num_timings = timings.size();
-                std::vector<int> counts(csize);
-                MPI_Gather(&num_timings, 1, MPI_INT, counts.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
+                std::vector<int> call_starts(csize);
+                std::vector<int> call_ends(csize);
+                const int starts_size = static_cast<int>(starts.size());
+                const int ends_size = static_cast<int>(ends.size());
+                MPI_Gather(&starts_size, 1, MPI_INT, call_starts.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
+                MPI_Gather(&ends_size, 1, MPI_INT, call_ends.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-                // Process 0 creates or opens the file and writes the header and its own timings to the file first
                 if (rank == 0) {
                         std::ofstream out_file(filename);
                         if (!out_file) {
@@ -195,17 +295,20 @@ public:
 
                         out_file.seekp(0, std::ios::end);
                         if (out_file.tellp() == 0) {
-                                out_file << "Rank,Iteration,Latency\n";
+                                out_file << "Rank,Iteration,Starttime,Endtime\n";
                         }
-                        for (int i = 0; i < num_timings; ++i) {
-                                out_file << rank << "," << i << "," << timings[i] << "\n";
+                        for (int i = 0; i < starts_size; ++i) {
+                                out_file << rank << ","
+                                                << i << ","
+                                                << starts[i] << ","
+                                                << ends[i] << "\n";
                         }
                         out_file.close();
                 } else {
-                        MPI_Send(timings.data(), num_timings, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+                        MPI_Send(starts.data(), starts_size, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+                        MPI_Send(ends.data(), ends_size, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
                 }
 
-                // Process 0 receives and appends timings from all other processes
                 if (rank == 0) {
                         std::ofstream out_file(filename, std::ios::app);
                         if (!out_file) {
@@ -213,18 +316,30 @@ public:
                                 exit(EXIT_FAILURE);
                         }
 
-                        std::vector<double> recv_timings;
+                        std::vector<double> recv_starts;
+                        std::vector<double> recv_ends;
                         for (int r = 1; r < csize; ++r) {
-                                recv_timings.resize(counts[r]);
-                                MPI_Recv(recv_timings.data(),
-                                         counts[r],
+                                recv_starts.resize(call_starts[r]);
+                                recv_ends.resize(call_ends[r]);
+                                MPI_Recv(recv_starts.data(),
+                                         call_starts[r],
                                          MPI_DOUBLE,
                                          r,
                                          0,
                                          MPI_COMM_WORLD,
                                          MPI_STATUS_IGNORE);
-                                for (int i = 0; i < counts[r]; ++i) {
-                                        out_file << r << "," << i << "," << recv_timings[i] << "\n";
+                                MPI_Recv(recv_ends.data(),
+                                         call_ends[r],
+                                         MPI_DOUBLE,
+                                         r,
+                                         0,
+                                         MPI_COMM_WORLD,
+                                         MPI_STATUS_IGNORE);
+                                for (int i = 0; i < call_starts[r]; ++i) {
+                                        out_file << r << ","
+                                                        << i << ","
+                                                        << recv_starts[i] << ","
+                                                        << recv_ends[i] << "\n";
                                 }
                         }
                         out_file.close();
@@ -257,12 +372,12 @@ int main(int argc, char *argv[])
                 case 'h':
                         // @formatter:off
                         std::cout << "Help: This program runs a MPI scatterv\n"
-                                        << "Options:\n"
-                                        << "  -h, --help            Show this help message\n"
-                                        << "  -m, --fmessages FILE  Specify file with messages (default: default_messages.txt)\n"
-                                        << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
-                                        << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
-                                        << "  -v, --verbose         Enable verbose mode\n";
+                                  << "Options:\n"
+                                  << "  -h, --help            Show this help message\n"
+                                  << "  -m, --fmessages FILE  Specify file with messages (default: default_messages.txt)\n"
+                                  << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
+                                  << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
+                                  << "  -v, --verbose         Enable verbose mode\n";
                 // @formatter:on
                         return EXIT_SUCCESS;
                 case 'm':

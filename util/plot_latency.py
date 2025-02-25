@@ -1,20 +1,22 @@
 import matplotlib.pyplot as plt
 import argparse
 import csv
-import numpy as np
 
 from collections import defaultdict
 
 
 def plot_latencies(filename):
-        iterations, latencies, ranks = [], [], []
+        iterations, ranks, starts, ends = [], [], [], []
 
         with open(filename, newline='') as csvfile:
                 reader = csv.DictReader(csvfile)
                 for row in reader:
                         iterations.append(int(row["Iteration"]))
-                        latencies.append(float(row["Latency"]))
+                        starts.append(float(row["Starttime"]))
+                        ends.append(float(row["Endtime"]))
                         ranks.append(int(row["Rank"]))
+
+        latencies = [(end-start)*1e6 for start, end in zip(starts,ends)]
 
         # Create a figure with two subplots (line plot and boxplot)
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
@@ -22,23 +24,23 @@ def plot_latencies(filename):
         ######## Lineplot
         # Line plot showing max latency over all processes at each iteration
 
-        iter_to_latencies = defaultdict(list)
-        for it, latency in zip(iterations, latencies):
-                iter_to_latencies[it].append(latency)
+        sorted_iterations = sorted(set(iterations))
+        niterations = sorted_iterations[-1] + 1
 
-        sorted_iterations = sorted(iter_to_latencies.keys())
-        max_latencies = [max(iter_to_latencies[it]) for it in sorted_iterations]
+        ax1.scatter(sorted_iterations, latencies[0:niterations], label=f"Rank 0", color='r', s=10, marker="o")
+        ax1.scatter(sorted_iterations, latencies[niterations:2*niterations], label=f"Rank 1", color='b', s=10, marker="o")
+        ax1.scatter(sorted_iterations, latencies[2*niterations:3*niterations], label=f"Rank 2", color='g', s=10, marker="o")
+        ax1.scatter(sorted_iterations, latencies[3*niterations:], label=f"Rank 3", color='y', s=10, marker="o")
 
-        # Plot the maximum latency for each iteration as a continuous line
-        ax1.plot(sorted_iterations, max_latencies, label="Max Latency")
-
-        ax1.set_title("Max Latency Over All Processes by Iteration")
+        # Plot details
+        ax1.set_title("Latency by Rank Over Iterations")
         ax1.set_xlabel("Iteration")
         ax1.set_ylabel("Max Latency (seconds)")
         ax1.legend(loc="upper right")
         ax1.grid(True, linestyle="--", alpha=0.6)
 
-        ##### Boxplot
+
+        #### Boxplot
 
         data = defaultdict(list)
         for rank, latency in zip(ranks, latencies):
