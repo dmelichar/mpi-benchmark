@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 #include <deque>
 #include <fstream>
@@ -12,12 +11,16 @@
 
 #include <mpi.h>
 
+template <typename T>
 class Scatterv {
 
-        int rank{};
-        int csize{};
-        std::vector<double> sbuffer;
-        std::vector<double> rbuffer;
+        int rank;
+        int csize;
+        int iter;
+
+        std::vector<T> sbuffer;
+        std::vector<T> rbuffer;
+
         std::vector<int> displs;
         std::vector<int> sendcounts;
 
@@ -28,8 +31,6 @@ class Scatterv {
         void setup(const std::string &filename)
         {
                 sendcounts.resize(csize, 0);
-                displs.resize(csize, 0);
-
                 if (rank == 0) {
                         std::ifstream file(filename);
                         if (!file) {
@@ -56,8 +57,7 @@ class Scatterv {
                                 std::cerr << "ERROR: Number of columns "
                                           << "(" << row.size() << ") "
                                           << "does not match number of processes "
-                                          << "(" << csize << ")."
-                                          << std::endl;
+                                          << "(" << csize << ")." << std::endl;
                                 // @formatter:on
                                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
                         }
@@ -65,7 +65,7 @@ class Scatterv {
                         sbuffer.resize(std::accumulate(row.begin(), row.end(), 0));
                         int value = 1, offset = 0;
                         for (int i : row) {
-                                std::fill_n(sbuffer.begin() + offset, i, value);
+                                std::fill_n(sbuffer.begin() + offset, i, static_cast<T>(value));
                                 offset += i;
                                 ++value;
                         }
@@ -76,14 +76,21 @@ class Scatterv {
                 MPI_Bcast(sendcounts.data(), csize, MPI_INT, 0, MPI_COMM_WORLD);
                 rbuffer.resize(sendcounts[rank]);
 
+                displs.resize(csize, 0);
                 for (int i = 1; i < csize; ++i) {
                         displs[i] = displs[i - 1] + sendcounts[i - 1];
                 }
         }
 
 public:
+        MPI_Datatype MPI_Type();
+
         Scatterv()
         {
+                rank = -1;
+                csize = -1;
+                iter = -1;
+
                 MPI_Comm_rank(MPI_COMM_WORLD, &rank);
                 MPI_Comm_size(MPI_COMM_WORLD, &csize);
 
@@ -104,16 +111,21 @@ public:
                 }
                 MPI_Bcast(&global_start_time, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
+                if (rank == 0) {
+                        std::cout << sbuffer.size() << std::endl;
+                        std::cout << sizeof(sbuffer) << std::endl;
+                }
+
                 MPI_Barrier(MPI_COMM_WORLD);
                 while (true) {
                         const double t_start = MPI_Wtime();
                         MPI_Scatterv(sbuffer.data(),
                                      sendcounts.data(),
                                      displs.data(),
-                                     MPI_DOUBLE,
+                                     MPI_Type(),
                                      rbuffer.data(),
                                      sendcounts[rank],
-                                     MPI_DOUBLE,
+                                     MPI_Type(),
                                      0,
                                      MPI_COMM_WORLD);
                         const double t_stop = MPI_Wtime();
@@ -273,11 +285,8 @@ public:
                         if (out_file.tellp() == 0) {
                                 out_file << "Rank,Iteration,Starttime,Endtime\n";
                         }
-                        for (int i = 0; i < starts_size; ++i) {
-                                out_file << rank << ","
-                                                << i << ","
-                                                << starts[i] << ","
-                                                << ends[i] << "\n";
+                        for (int i = 0; i < iter; ++i) {
+                                out_file << rank << "," << i << "," << starts[i] << "," << ends[i] << "\n";
                         }
                         out_file.close();
                 } else {
@@ -325,6 +334,22 @@ public:
         }
 };
 
+template <>
+MPI_Datatype Scatterv<int>::MPI_Type() {
+        return MPI_INT;
+}
+
+template <>
+MPI_Datatype Scatterv<double>::MPI_Type() {
+        return MPI_DOUBLE;
+}
+
+template <>
+MPI_Datatype Scatterv<char>::MPI_Type() {
+        return MPI_CHAR;
+}
+
+
 int main(int argc, char *argv[])
 {
         const option long_options[] = {{"help", no_argument, nullptr, 'h'},
@@ -332,18 +357,22 @@ int main(int argc, char *argv[])
                                        {"foutput", required_argument, nullptr, 'o'},
                                        {"timeout", required_argument, nullptr, 't'},
                                        {"verbose", no_argument, nullptr, 'v'},
+                                        {"dtype", required_argument, nullptr, 'd'},
                                        {nullptr, 0, nullptr, 0}};
 
         std::string fmessages = "default_messages.txt";
         std::string foutput = "default_output.txt";
         int timeout = 10;
         bool verbose = false;
+        std::string dtype = "double";
+
 
         int opt;
 
         while ((opt = getopt_long(argc, argv, "hm:o:n:t:v", long_options, nullptr)) != -1) {
                 switch (opt) {
                 case 'h':
+                        // TODO Multiple outputs
                         // @formatter:off
                         std::cout << "Help: This program runs a MPI scatterv\n"
                                   << "Options:\n"
@@ -351,14 +380,18 @@ int main(int argc, char *argv[])
                                   << "  -m, --fmessages FILE  Specify file with messages (default: default_messages.txt)\n"
                                   << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
                                   << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
+                                  << "  -d, --dtype TYPE      Specify char for MPI_CHAR, double MPI_DOUBLE or int for MPI_INT32 (default: double)\n"
                                   << "  -v, --verbose         Enable verbose mode\n";
-                // @formatter:on
+                        // @formatter:on
                         return EXIT_SUCCESS;
                 case 'm':
                         fmessages = optarg;
                         break;
                 case 'o':
                         foutput = optarg;
+                        break;
+                case 'd':
+                        dtype = optarg;
                         break;
                 case 'v':
                         verbose = true;
@@ -375,12 +408,27 @@ int main(int argc, char *argv[])
 
         MPI_Init(&argc, &argv);
         try {
-                Scatterv benchmark;
-                benchmark.run(fmessages, timeout, verbose);
-                benchmark.save_latencies(foutput, verbose);
+                if (dtype == "double") {
+                        Scatterv<double> benchmark;
+                        benchmark.run(fmessages, timeout, verbose);
+                        benchmark.save_latencies(foutput, verbose);
+                } else if (dtype == "int") {
+                        Scatterv<int> benchmark;
+                        benchmark.run(fmessages, timeout, verbose);
+                        benchmark.save_latencies(foutput, verbose);
+                } else if (dtype == "char") {
+                        Scatterv<char> benchmark;
+                        benchmark.run(fmessages, timeout, verbose);
+                        benchmark.save_latencies(foutput, verbose);
+                } else {
+                        std::cerr << "Unknown dtype option: " << dtype << std::endl;
+                        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+                        return EXIT_FAILURE;
+                }
         } catch (const std::exception &e) {
                 std::cerr << "ERROR: " << e.what() << std::endl;
                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+                return EXIT_FAILURE;
         }
         MPI_Finalize();
         return EXIT_SUCCESS;
