@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <deque>
 #include <fstream>
 #include <getopt.h>
 #include <iomanip>
@@ -19,8 +20,9 @@ class Scatterv {
         std::vector<double> rbuffer;
         std::vector<int> displs;
         std::vector<int> sendcounts;
-        std::vector<double> starts;
-        std::vector<double> ends;
+
+        std::deque<double> starts;
+        std::deque<double> ends;
 
         // Prepare messages
         void setup(const std::string &filename)
@@ -137,63 +139,45 @@ public:
                 const int ends_size = static_cast<int>(ends.size());
                 MPI_Gather(&starts_size, 1, MPI_INT, call_starts.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
                 MPI_Gather(&ends_size, 1, MPI_INT, call_ends.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
-
                 if (rank == 0) {
-                        if (!std::ranges::all_of(call_starts.begin(),
-                                                 call_starts.end(),
-                                                 [&](const int x) { return x == call_starts[0]; })) {
-                                std::cerr << "ERROR: Timing buffers mismatch." << std::endl;
+                        // @formatter:off
+                        if (!std::ranges::all_of(call_starts.begin(), call_starts.end(), [&](const int x) {
+                                    return x == call_starts[0];
+                            })) {
+                                std::cerr << "ERROR: Timing buffers mismatch: "
+                                             "Process has different number of iterations in starts"
+                                          << std::endl;
                                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
                         }
-                        if (!std::ranges::all_of(call_ends.begin(),
-                                                 call_ends.end(),
-                                                 [&](const int x) { return x == call_ends[0]; })) {
-                                std::cerr << "ERROR: Timing buffers mismatch." << std::endl;
+                        if (!std::ranges::all_of(
+                                call_ends.begin(), call_ends.end(), [&](const int x) { return x == call_ends[0]; })) {
+                                std::cerr << "ERROR: Timing buffers mismatch: "
+                                             "Process has different number of iterations in ends"
+                                          << std::endl;
                                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
                         }
+                        if (call_starts.front() != call_ends.front()) {
+                                std::cerr << "ERROR: Timing buffers mismatch: "
+                                             "Starts and ends are different size"
+                                          << std::endl;
+                                MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+                        }
+                        // @formatter:on
                 }
-                const int iter = call_starts[0];
+                iter = static_cast<int>(starts.size());
 
-                // call_starts/ends should be the number of iterations of each process, i.e. each p should have
-                // the call_starts/ends = [niterations]*csize
-                std::vector<double> all_starts;
-                std::vector<double> all_ends;
-                int sum;
-                if (rank == 0) {
-                        sum = std::accumulate(call_starts.begin(), call_starts.end(), 0);
-                        if (sum != std::accumulate(call_ends.begin(), call_ends.end(), 0)) {
-                                std::cerr << "ERROR: Timing buffers mismatch." << std::endl;
-                                MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-                        }
-                        all_starts.resize(sum);
-                        all_ends.resize(sum);
+                std::vector<double> lat(iter);
+                for (int i = 0; i <= iter; ++i) {
+                        lat[i] = ends[i] - starts[i];
                 }
 
-                MPI_Gather(starts.data(),
-                           starts_size,
-                           MPI_DOUBLE,
-                           all_starts.data(),
-                           starts_size,
-                           MPI_DOUBLE,
-                           0,
-                           MPI_COMM_WORLD);
-                MPI_Gather(ends.data(),
-                           ends_size,
-                           MPI_DOUBLE,
-                           all_ends.data(),
-                           ends_size,
-                           MPI_DOUBLE,
-                           0,
-                           MPI_COMM_WORLD);
-
+                std::vector<double> latencies;
                 if (rank == 0) {
-                        std::vector<double> latencies(sum);
-                        std::transform(all_ends.begin(),
-                                       all_ends.end(),
-                                       all_starts.begin(),
-                                       latencies.begin(),
-                                       std::minus());
+                        latencies.resize(iter * csize);
+                }
+                MPI_Gather(lat.data(), iter, MPI_DOUBLE, latencies.data(), starts_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
+                if (rank == 0 && verbose) {
                         // Compute local min, max, average for each p (i.e. for each process' time)
                         std::vector<double> min_local(csize);
                         std::vector<double> max_local(csize);
@@ -209,27 +193,24 @@ public:
                         }
 
                         // Output local
-                        if (verbose) {
-                                // @formatter:off
-                                std::ostringstream oss;
-                                oss << std::left
-                                    << std::setw(25) << ""
-                                    << std::setw(25) << "Avg Latency (μs)"
-                                    << std::setw(25) << "Min Latency (μs)"
-                                    << std::setw(25) << "Max Latency (μs)"
-                                    << std::endl;
-                                for (int i = 0; i < csize; ++i) {
-                                        oss << std::left
-                                            << std::setw(25) << "Rank " + std::to_string(i)
-                                            << std::setw(25) << avg_local[i] * 1e6
-                                            << std::setw(25) << min_local[i] * 1e6
-                                            << std::setw(25) << max_local[i] * 1e6
-                                            << std::endl;
 
-                                }
-                                std::cout << oss.str() << std::endl;
-                                // @formatter: on
+                        // @formatter:off
+                        std::ostringstream oss1;
+                        oss1 << std::left << std::setw(25) << ""
+                                         << std::setw(25) << "Avg Latency (μs)"
+                                         << std::setw(25) << "Min Latency (μs)"
+                                         << std::setw(25) << "Max Latency (μs)"
+                                         << std::endl;
+                        for (int i = 0; i < csize; ++i) {
+                                oss1 << std::left << std::setw(25) << "Rank " + std::to_string(i)
+                                                 << std::setw(25) << avg_local[i] * 1e6
+                                                 << std::setw(25) << min_local[i] * 1e6
+                                                 << std::setw(25) << max_local[i] * 1e6
+                                                 << std::endl;
                         }
+                        std::cout << oss1.str() << std::endl;
+                        // @formatter:on
+
 
                         // Compute global min, max, average by iteration over all processes
                         std::vector<double> min_global(iter);
@@ -246,31 +227,28 @@ public:
                         }
 
 
-                        // Output global
-                        if (verbose) {
-                                double vmin_global = *std::ranges::min_element(min_global);
-                                double vmax_global = *std::ranges::max_element(max_global);
-                                double vavg_global = std::accumulate(avg_global.begin(), avg_global.end(), 0.0) / iter;
+                        double vmin_global = *std::ranges::min_element(min_global);
+                        double vmax_global = *std::ranges::max_element(max_global);
+                        double vavg_global = std::accumulate(avg_global.begin(), avg_global.end(), 0.0) / iter;
 
-                                // @formatter:off
-                                std::ostringstream oss;
-                                oss << std::left
-                                    << std::setw(25) << "Global messages count"
-                                    << std::setw(25) << "Avg Latency (μs)"
-                                    << std::setw(25) << "Min Latency (μs)"
-                                    << std::setw(25) << "Max Latency (μs)"
-                                    << std::setw(25) << "Iterations"
-                                    << std::endl
-                                    << std::setw(25) << sbuffer.size()
-                                    << std::setw(25) << vavg_global * 1e6
-                                    << std::setw(25) << vmin_global * 1e6
-                                    << std::setw(25) << vmax_global * 1e6
-                                    << std::setw(25) << iter
-                                    << std::endl
-                                    << std::endl;
-                                std::cout << oss.str() << std::endl;
-                                // @formatter:on
-                        }
+                        // @formatter:off
+                        std::ostringstream oss2;
+                        oss2 << std::left << std::setw(25) << "Global messages count"
+                                         << std::setw(25) << "Avg Latency (μs)"
+                                         << std::setw(25) << "Min Latency (μs)"
+                                         << std::setw(25) << "Max Latency (μs)"
+                                         << std::setw(25) << "Iterations"
+                                         << std::endl
+                                         << std::setw(25) << sbuffer.size()
+                                         << std::setw(25) << vavg_global * 1e6
+                                         << std::setw(25) << vmin_global * 1e6
+                                         << std::setw(25) << vmax_global * 1e6
+                                         << std::setw(25) << iter
+                                         << std::endl
+                                         << std::endl;
+                        std::cout << oss2.str() << std::endl;
+                        // @formatter:on
+
                 }
 
                 MPI_Barrier(MPI_COMM_WORLD);
@@ -279,12 +257,10 @@ public:
         // Save data to file
         void save_latencies(const std::string &filename, const bool verbose = false) const
         {
-                std::vector<int> call_starts(csize);
-                std::vector<int> call_ends(csize);
-                const int starts_size = static_cast<int>(starts.size());
-                const int ends_size = static_cast<int>(ends.size());
-                MPI_Gather(&starts_size, 1, MPI_INT, call_starts.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
-                MPI_Gather(&ends_size, 1, MPI_INT, call_ends.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
+                if (starts.empty()  || ends.empty() || iter == -1) {
+                        std::cerr << "ERROR: Must run first before saving" << std::endl;
+                        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+                }
 
                 if (rank == 0) {
                         std::ofstream out_file(filename);
@@ -305,8 +281,11 @@ public:
                         }
                         out_file.close();
                 } else {
-                        MPI_Send(starts.data(), starts_size, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
-                        MPI_Send(ends.data(), ends_size, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+                        // Needs to be contiguous memory block
+                        std::vector vec_starts(starts.begin(), starts.end());
+                        std::vector vec_ends(ends.begin(), ends.end());
+                        MPI_Send(vec_starts.data(), iter, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+                        MPI_Send(vec_ends.data(), iter, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
                 }
 
                 if (rank == 0) {
@@ -316,30 +295,25 @@ public:
                                 exit(EXIT_FAILURE);
                         }
 
-                        std::vector<double> recv_starts;
-                        std::vector<double> recv_ends;
+                        std::vector<double> recv_starts(iter);
+                        std::vector<double> recv_ends(iter);
                         for (int r = 1; r < csize; ++r) {
-                                recv_starts.resize(call_starts[r]);
-                                recv_ends.resize(call_ends[r]);
                                 MPI_Recv(recv_starts.data(),
-                                         call_starts[r],
+                                         iter,
                                          MPI_DOUBLE,
                                          r,
                                          0,
                                          MPI_COMM_WORLD,
                                          MPI_STATUS_IGNORE);
                                 MPI_Recv(recv_ends.data(),
-                                         call_ends[r],
+                                         iter,
                                          MPI_DOUBLE,
                                          r,
                                          0,
                                          MPI_COMM_WORLD,
                                          MPI_STATUS_IGNORE);
-                                for (int i = 0; i < call_starts[r]; ++i) {
-                                        out_file << r << ","
-                                                        << i << ","
-                                                        << recv_starts[i] << ","
-                                                        << recv_ends[i] << "\n";
+                                for (int i = 0; i < iter; ++i) {
+                                        out_file << r << "," << i << "," << recv_starts[i] << "," << recv_ends[i] << "\n";
                                 }
                         }
                         out_file.close();
