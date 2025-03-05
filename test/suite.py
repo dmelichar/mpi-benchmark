@@ -33,7 +33,7 @@ class GlobalConfigOutput(BaseModel):
 
 class GlobalConfig(BaseModel):
         max_runtime: int = Field(ge=0, description="Maximum runtime in seconds for each test")
-        processes: int = Field(ge=2, description="Number of processes")
+        nproc: int = Field(ge=2, description="Number of processes")
         trials: Optional[int] = Field(default=1, description="Number of times to run all tests")
         output: GlobalConfigOutput = None
 
@@ -106,6 +106,8 @@ def main(filename: str, executor: str, ask: bool = False):
                         op = cwd / test.collective
                         op = cwd / op
 
+                        nproc = str(benchmark.global_config.nproc)
+
                         if isinstance(test.messages_data, str):
                                 messages_data = test.messages_data
                         else:
@@ -119,6 +121,9 @@ def main(filename: str, executor: str, ask: bool = False):
 
                                 _, messages_data = generate_data_file(data, params)
 
+                                if "nproc" in params.keys():
+                                        nproc = str(params["nproc"])
+
                         for i in range(benchmark.global_config.trials):
                                 now = datetime.datetime.now()
                                 diff = (now - start).total_seconds()
@@ -131,11 +136,12 @@ def main(filename: str, executor: str, ask: bool = False):
                                 executor_command = []
                                 if executor == "srun":
                                         executor_command.append(executor)
-                                        executor_command.append(f"-N{str(benchmark.global_config.processes)}")
-                                        executor_command.append(f"--ntasks-per-node=1")
+                                        executor_command.append(f"-N{nproc}")
+                                        executor_command.append("--ntasks-per-node=1")
                                 elif executor == "mpirun":
                                         executor_command.append(executor)
-                                        executor_command.append(f"-np {str(benchmark.global_config.processes)}")
+                                        executor_command.append("-np")
+                                        executor_command.append(nproc)
 
                                 mpi_command = [str(op),
                                                "--fmessages", str(messages_data),
@@ -176,7 +182,7 @@ if __name__ == "__main__":
         parser = argparse.ArgumentParser()
         parser.add_argument("filename")
         parser.add_argument("--ask", action='store_true', help="If false will create output directory")
-        parser.add_argument("--executor", help="The executor to run: mpirun or srun")
+        parser.add_argument("--executor", default="mpirun", help="The executor to run: mpirun or srun")
         args = parser.parse_args()
 
         assert shutil.which(args.executor) is not None, f"{args.executor} was not found in path"

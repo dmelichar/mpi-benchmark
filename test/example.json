@@ -2,12 +2,6 @@
     "benchmark_name": "test_scatterv_bcast",
     "test_suite": [
         {
-            "test_name": "scatterv_custom",
-            "test_type": "latency",
-            "collective": "scatterv",
-            "messages_data": "custom.csv"
-        },
-        {
             "test_name": "scatterv_gen",
             "test_type": "latency",
             "collective": "scatterv",
@@ -22,7 +16,7 @@
     ],
     "global_config": {
         "max_runtime": 3600,
-        "processes": 4,
+        "nproc": 4,
         "trials": 3,
         "output": {
             "directory": "./results",
