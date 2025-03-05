@@ -114,7 +114,6 @@ public:
                 MPI_Bcast(sendcounts, csize, MPI_INT, 0, MPI_COMM_WORLD);
                 rbuffer = new T[sendcounts[rank]];
 
-
                 displs = new int[csize];
                 displs[0] = 0;
                 for (int i = 1; i < csize; ++i) {
@@ -279,12 +278,12 @@ public:
                         out_file.close();
                 } else {
                         // Needs to be contiguous memory block
-                        std::vector<std::array<double, 2>> vec_times;
-                        vec_times.reserve(times.size());
+                        std::vector<double> vec_times(iter*2);
                         for (const auto& [fst, snd] : times) {
-                                vec_times.push_back(snd);
+                                vec_times.push_back(snd[0]);
+                                vec_times.push_back(snd[1]);
                         }
-                        MPI_Send(vec_times.data(), iter, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+                        MPI_Send(vec_times.data(), iter*2, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
                 }
 
                 if (rank == 0) {
@@ -294,21 +293,21 @@ public:
                                 exit(EXIT_FAILURE);
                         }
 
-                        std::vector<std::array<double, 2>> recv_vec_times;
+                        std::vector<double> recv_vec_times(iter*2);
                         recv_vec_times.reserve(times.size());
                         for (int r = 1; r < csize; ++r) {
                                 MPI_Recv(recv_vec_times.data(),
-                                         iter,
+                                         iter*2,
                                          MPI_DOUBLE,
                                          r,
                                          0,
                                          MPI_COMM_WORLD,
                                          MPI_STATUS_IGNORE);
-                                for (int i = 0; i < iter; ++i) {
+                                for (int i = 1; i < iter; i=i+2) {
                                         out_file << r << ","
                                                  << i << ","
-                                                 << std::fixed << std::setprecision(15) << recv_vec_times[i][0] << ","
-                                                 << std::fixed << std::setprecision(15) << recv_vec_times[i][1] << "\n";
+                                                 << std::fixed << std::setprecision(15) << recv_vec_times[i-1] << ","
+                                                 << std::fixed << std::setprecision(15) << recv_vec_times[i] << "\n";
                                 }
                         }
                         out_file.close();
