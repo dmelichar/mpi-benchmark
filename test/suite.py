@@ -75,7 +75,7 @@ def generate_data_file(data: str, params: dict):
                 raise ValueError(f"Unknown test name {data}")
 
 
-def main(filename: str, ask: bool = False):
+def main(filename: str, executor: str, ask: bool = False):
         try:
                 json_string = pathlib.Path(filename).read_text()
                 benchmark = OpenMPIBenchmarkConfig.model_validate_json(json_string, strict=True)
@@ -128,18 +128,24 @@ def main(filename: str, ask: bool = False):
 
                                 foutput = output / f"{test.test_name}-{i + 1}.csv"
 
-                                mpi_command = ["mpirun",
-                                               "--wdir", str(cwd),
-                                               "-np", str(benchmark.global_config.processes),
-                                               str(op),
+                                executor_command = []
+                                if executor == "srun":
+                                        executor_command.append(executor)
+                                        executor_command.append(f"-N{str(benchmark.global_config.processes)}")
+                                        executor_command.append(f"-ntasks-per-node=1")
+                                elif executor == "mpirun":
+                                        executor_command.append(executor)
+                                        executor_command.append(f"-np {str(benchmark.global_config.processes)}")
+
+                                mpi_command = [str(op),
                                                "--fmessages", str(messages_data),
                                                "--foutput", str(foutput),
                                                "--timeout", str(test.timeout),
                                                "--verbose" if verbose else ""
                                                ]
-
+                                command = executor_command + mpi_command
                                 print(f"==> Trial [{i + 1} / {benchmark.global_config.trials}]", end=end, flush=True)
-                                result = subprocess.run(mpi_command,
+                                result = subprocess.run(command,
                                                         check=True,
                                                         env=env,
                                                         )
@@ -167,11 +173,12 @@ def main(filename: str, ask: bool = False):
 
 
 if __name__ == "__main__":
-        assert shutil.which("mpirun") is not None, "mpirun was not found in path"
-
         parser = argparse.ArgumentParser()
         parser.add_argument("filename")
         parser.add_argument("--ask", action='store_true', help="If false will create output directory")
+        parser.add_argument("--executor", help="The executor to run: mpirun or srun")
         args = parser.parse_args()
 
-        main(args.filename)
+        assert shutil.which(args.executor) is not None, f"{args.executor} was not found in path"
+
+        main(filename=args.filename, ask=args.ask, executor=args.executor)
