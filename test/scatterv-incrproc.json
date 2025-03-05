@@ -1,5 +1,5 @@
 {
-    "benchmark_name": "test-scatterv-incrproc-alldist",
+    "benchmark_name": "test-scatterv-alldist",
     "test_suite": [
         {
             "test_name": "scatterv-equal-4p-100",

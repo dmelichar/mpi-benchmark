@@ -1,0 +1,143 @@
+{
+    "benchmark_name": "test-scatterv-alldist",
+    "test_suite": [
+        {
+            "test_name": "scatterv-equal",
+            "test_type": "latency",
+            "collective": "scatterv",
+            "messages_data": {
+                "data": "equal",
+                "params": {
+                    "nproc": 4,
+                    "val": 10
+                }
+            }
+        },
+        {
+            "test_name": "scatterv-normal",
+            "test_type": "latency",
+            "collective": "scatterv",
+            "messages_data": {
+                "data": "normal",
+                "params": {
+                    "nproc": 4
+                }
+            }
+        },
+        {
+            "test_name": "scatterv-exponential",
+            "test_type": "latency",
+            "collective": "scatterv",
+            "messages_data": {
+                "data": "exponential",
+                "params": {
+                    "nproc": 4
+                }
+            }
+        },
+        {
+            "test_name": "scatterv-increasing",
+            "test_type": "latency",
+            "collective": "scatterv",
+            "messages_data": {
+                "data": "increasing",
+                "params": {
+                    "nproc": 4,
+                    "avg": 3
+                }
+            }
+        },
+        {
+            "test_name": "scatterv-decreasing",
+            "test_type": "latency",
+            "collective": "scatterv",
+            "messages_data": {
+                "data": "decreasing",
+                "params": {
+                    "nproc": 4,
+                    "avg": 3
+                }
+            }
+        },
+        {
+            "test_name": "scatterv-zipfian",
+            "test_type": "latency",
+            "collective": "scatterv",
+            "messages_data": {
+                "data": "zipfian",
+                "params": {
+                    "nproc": 4
+                }
+            }
+        },
+        {
+            "test_name": "scatterv-uniform",
+            "test_type": "latency",
+            "collective": "scatterv",
+            "messages_data": {
+                "data": "uniform",
+                "params": {
+                    "nproc": 4,
+                    "avg": 3
+                }
+            }
+        },
+        {
+            "test_name": "scatterv-bucket",
+            "test_type": "latency",
+            "collective": "scatterv",
+            "messages_data": {
+                "data": "bucket",
+                "params": {
+                    "nproc": 4,
+                    "avg": 10
+                }
+            }
+        },
+        {
+            "test_name": "scatterv-spikes",
+            "test_type": "latency",
+            "collective": "scatterv",
+            "messages_data": {
+                "data": "spikes",
+                "params": {
+                    "nproc": 4,
+                    "avg": 3
+                }
+            }
+        },
+        {
+            "test_name": "scatterv-alternating",
+            "test_type": "latency",
+            "collective": "scatterv",
+            "messages_data": {
+                "data": "alternating",
+                "params": {
+                    "nproc": 4,
+                    "avg": 3
+                }
+            }
+        },
+        {
+            "test_name": "scatterv-two-blocks",
+            "test_type": "latency",
+            "collective": "scatterv",
+            "messages_data": {
+                "data": "two_blocks",
+                "params": {
+                    "nproc": 4,
+                    "avg": 3
+                }
+            }
+        }
+    ],
+    "global_config": {
+        "max_runtime": 3600,
+        "nproc": 4,
+        "trials": 5,
+        "output": {
+            "directory": "./results",
+            "verbose": true
+        }
+    }
+}
