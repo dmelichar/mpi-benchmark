@@ -57,7 +57,7 @@
                 "data": "increasing",
                 "params": {
                     "nproc": 4,
-                    "val": 100
+                    "avg": 100
                 }
             }
         },
@@ -69,7 +69,7 @@
                 "data": "increasing",
                 "params": {
                     "nproc": 8,
-                    "val": 100
+                    "avg": 100
                 }
             }
         },
@@ -81,7 +81,7 @@
                 "data": "increasing",
                 "params": {
                     "nproc": 16,
-                    "val": 100
+                    "avg": 100
                 }
             }
         },
@@ -93,7 +93,7 @@
                 "data": "increasing",
                 "params": {
                     "nproc": 32,
-                    "val": 100
+                    "avg": 100
                 }
             }
         },
