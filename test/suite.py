@@ -132,7 +132,7 @@ def main(filename: str, executor: str, ask: bool = False):
                                 if executor == "srun":
                                         executor_command.append(executor)
                                         executor_command.append(f"-N{str(benchmark.global_config.processes)}")
-                                        executor_command.append(f"-ntasks-per-node=1")
+                                        executor_command.append(f"--ntasks-per-node=1")
                                 elif executor == "mpirun":
                                         executor_command.append(executor)
                                         executor_command.append(f"-np {str(benchmark.global_config.processes)}")
