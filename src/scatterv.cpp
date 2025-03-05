@@ -268,9 +268,13 @@ public:
                         out_file.seekp(0, std::ios::end);
                         if (out_file.tellp() == 0) {
                                 out_file << "Rank,Iteration,Starttime,Endtime\n";
+                                out_file.flush();
                         }
                         for (const auto &[fst, snd] : times) {
-                                out_file << rank << "," << fst << "," << snd[0] << "," << snd[1] << "\n";
+                                out_file << rank << ","
+                                         << fst << ","
+                                         << std::fixed << std::setprecision(15) << snd[0] << ","
+                                         << std::fixed << std::setprecision(15) << snd[1] << "\n";
                         }
                         out_file.close();
                 } else {
@@ -301,7 +305,10 @@ public:
                                          MPI_COMM_WORLD,
                                          MPI_STATUS_IGNORE);
                                 for (int i = 0; i < iter; ++i) {
-                                        out_file << r << "," << i << "," << recv_vec_times[i][0] << "," << recv_vec_times[i][1] << "\n";
+                                        out_file << r << ","
+                                                 << i << ","
+                                                 << std::fixed << std::setprecision(15) << recv_vec_times[i][0] << ","
+                                                 << std::fixed << std::setprecision(15) << recv_vec_times[i][1] << "\n";
                                 }
                         }
                         out_file.close();
