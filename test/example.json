@@ -2,34 +2,22 @@
     "benchmark_name": "test_scatterv_bcast",
     "test_suite": [
         {
-            "test_name": "bcast_custom",
-            "test_type": "latency",
-            "collective": "bcast",
-            "messages_data": "custom.csv"
-        },
-        {
-            "test_name": "bcast_equal",
-            "test_type": "latency",
-            "collective": "bcast",
-            "messages_data": "4-equal.csv"
-        },
-        {
-            "test_name": "bcast_normal",
-            "test_type": "latency",
-            "collective": "bcast",
-            "messages_data": "4-normal.csv" 
-        },
-        {
-            "test_name": "gatherv_custom",
-            "test_type": "latency",
-            "collective": "gatherv",
-            "messages_data": "custom.csv"
-        },
-        {
             "test_name": "scatterv_custom",
             "test_type": "latency",
             "collective": "scatterv",
             "messages_data": "custom.csv"
+        },
+        {
+            "test_name": "scatterv_gen",
+            "test_type": "latency",
+            "collective": "scatterv",
+            "messages_data": {
+                "data": "equal",
+                "params": {
+                    "nproc": 4,
+                    "val": 10
+                }
+            }
         }
     ],
     "global_config": {
