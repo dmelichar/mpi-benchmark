@@ -10,6 +10,7 @@
 #include <vector>
 #include <string>
 #include <array>
+#include <map>
 
 #include <mpi.h>
 
