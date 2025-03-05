@@ -114,6 +114,7 @@ def main(filename: str, executor: str, ask: bool = False):
                                 # Generate file based on test name and params
                                 data = test.messages_data.get("data")
                                 params = test.messages_data.get("params")
+                                params["savedir"] = str(output)
 
                                 if not data or not params:
                                         print("==> Invalid function parameters.")
