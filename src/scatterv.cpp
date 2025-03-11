@@ -337,7 +337,6 @@ int main(int argc, char *argv[])
         while ((opt = getopt_long(argc, argv, "hm:o:n:t:v", long_options, nullptr)) != -1) {
                 switch (opt) {
                 case 'h':
-                        // TODO Multiple outputs
                         // @formatter:off
                         std::cout << "Help: This program runs a MPI scatterv\n"
                                   << "Options:\n"
