@@ -17,7 +17,6 @@ class Scatterv {
 
         int rank;
         int csize;
-        int iter;
         int msg_size;
 
         T *sbuffer;
@@ -47,7 +46,6 @@ public:
         {
                 rank = -1;
                 csize = -1;
-                iter = 0;
 
                 sbuffer = nullptr;
                 rbuffer = nullptr;
@@ -160,7 +158,6 @@ public:
                         MPI_Bcast(&continue_loop, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
                         if (!continue_loop)
                                 break;
-                        ++iter;
                 }
                 MPI_Barrier(MPI_COMM_WORLD);
 
@@ -181,13 +178,13 @@ public:
                         // @formatter:on
                 }
 
-                std::vector<double> lat(iter);
-                for (int i = 0; i <= iter; ++i) {
+                std::vector<double> lat(times.size());
+                for (int i = 0; i <= times.size() / 2; ++i) {
                         lat[i] = times[i+1] - times[i];
                 }
                 double min_local = *std::ranges::min_element(lat);
                 double max_local = *std::ranges::max_element(lat);
-                double avg_local = std::accumulate(lat.begin(), lat.end(), 0.0) / iter;
+                double avg_local = std::accumulate(lat.begin(), lat.end(), 0.0) / (times.size()  / 2);
 
                 std::vector min_locals(csize, 0.0);
                 std::vector max_locals(csize, 0.0);
@@ -237,7 +234,7 @@ public:
                                          << std::setw(25) << avg_global * 1e6
                                          << std::setw(25) << min_global * 1e6
                                          << std::setw(25) << max_global * 1e6
-                                         << std::setw(25) << iter
+                                         << std::setw(25) << times.size() / 2
                                          << std::endl
                                          << std::endl;
                         std::cout << oss2.str() << std::endl;
@@ -251,7 +248,7 @@ public:
         // Save data to file
         void save_latencies(const std::string &filename, const bool verbose = false) const
         {
-                if (iter == 0) {
+                if (times.empty()) {
                         std::cerr << "ERROR: Must run first before saving" << std::endl;
                         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
                 }
@@ -268,7 +265,7 @@ public:
                                 out_file << "Rank,Iteration,Starttime,Endtime\n";
                                 out_file.flush();
                         }
-                        for (int i = 0; i < iter; ++i) {
+                        for (int i = 0; i < times.size()  / 2; ++i) {
                                 out_file << rank << ","
                                          << i << ","
                                          << std::fixed << std::setprecision(15) << times[i] << ","
@@ -277,12 +274,12 @@ public:
                         out_file.close();
                 } else {
                         // Needs to be contiguous memory block
-                        std::vector<double> vec_times(iter*2);
-                        for (int i = 0; i < iter; ++i) {
+                        std::vector<double> vec_times(times.size());
+                        for (int i = 0; i < times.size() / 2; ++i) {
                                 vec_times.push_back(times[i]);
                                 vec_times.push_back(times[i+1]);
                         }
-                        MPI_Send(vec_times.data(), iter*2, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+                        MPI_Send(vec_times.data(), times.size(), MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
                 }
 
                 if (rank == 0) {
@@ -293,15 +290,15 @@ public:
                         }
 
                         for (int r = 1; r < csize; ++r) {
-                                std::vector<double> recv_vec_times(iter*2);
+                                std::vector<double> recv_vec_times(times.size());
                                 MPI_Recv(recv_vec_times.data(),
-                                         iter*2,
+                                         times.size(),
                                          MPI_DOUBLE,
                                          r,
                                          0,
                                          MPI_COMM_WORLD,
                                          MPI_STATUS_IGNORE);
-                                for (int i = 0; i < iter; ++i) {
+                                for (int i = 0; i < times.size() / 2; ++i) {
                                         out_file << r << ","
                                                  << i << ","
                                                  << std::fixed << std::setprecision(15) << recv_vec_times[i] << ","
