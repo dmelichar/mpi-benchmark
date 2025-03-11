@@ -134,7 +134,6 @@
     "global_config": {
         "max_runtime": 3600,
         "nproc": 4,
-        "trials": 5,
         "output": {
             "directory": "./results",
             "verbose": true

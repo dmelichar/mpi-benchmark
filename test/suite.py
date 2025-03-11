@@ -76,91 +76,11 @@ def generate_data_file(data: str, params: dict):
 
 
 def main(filename: str, executor: str, ask: bool = False):
+        benchmark = None
         try:
                 json_string = pathlib.Path(filename).read_text()
                 benchmark = OpenMPIBenchmarkConfig.model_validate_json(json_string, strict=True)
                 env = os.environ.copy()
-
-                start = datetime.datetime.now()
-                verbose = benchmark.global_config.output.verbose
-                output = pathlib.Path(benchmark.global_config.output.directory)
-                if ask and output.exists():
-                        print(f"==> Output directory >{output}< exists. Overwrite? [y/n]")
-                        overwrite = input()
-                        if overwrite == "n":
-                                output = output.parent / f"results-{datetime.datetime.now().strftime('%Y%m%d-%H%M')}"
-                        elif overwrite != "y":
-                                print("==> Unknown input. Abort")
-                                sys.exit()
-                else:
-                        output = output.parent / f"results-{datetime.datetime.now().strftime('%Y%m%d-%H%M')}"
-
-                # Ensure the directory is created
-                output.mkdir(parents=True)
-                print(f"==> Created output directory: {output}")
-
-                for test in benchmark.test_suite:
-                        end = "\n" if verbose else "\t\t\t\t"
-                        print(f"==> Started {test.test_name}", end=end, flush=True)
-                        cwd = pathlib.Path().cwd()
-                        op = cwd / test.collective
-                        op = cwd / op
-
-                        nproc = str(benchmark.global_config.nproc)
-
-                        if isinstance(test.messages_data, str):
-                                messages_data = test.messages_data
-                        else:
-                                # Generate file based on test name and params
-                                data = test.messages_data.get("data")
-                                params = test.messages_data.get("params")
-                                params["savedir"] = str(output)
-
-                                if not data or not params:
-                                        print("==> Invalid function parameters.")
-                                        continue
-
-                                _, messages_data = generate_data_file(data, params)
-
-                                if "nproc" in params.keys():
-                                        nproc = str(params["nproc"])
-
-                        for i in range(benchmark.global_config.trials):
-                                now = datetime.datetime.now()
-                                diff = (now - start).total_seconds()
-                                if diff > benchmark.global_config.max_runtime:
-                                        print(f"==> Max runtime reached: EXIT")
-                                        sys.exit()
-
-                                foutput = output / f"{test.test_name}-{i + 1}.csv"
-
-                                executor_command = []
-                                if executor == "srun":
-                                        executor_command.append(executor)
-                                        executor_command.append(f"-N{nproc}")
-                                        executor_command.append("--ntasks-per-node=1")
-                                elif executor == "mpirun":
-                                        executor_command.append(executor)
-                                        executor_command.append("-np")
-                                        executor_command.append(nproc)
-
-                                mpi_command = [str(op),
-                                               "--fmessages", str(messages_data),
-                                               "--foutput", str(foutput),
-                                               "--timeout", str(test.timeout),
-                                               "--verbose" if verbose else ""
-                                               ]
-                                command = executor_command + mpi_command
-                                print(f"==> Trial [{i + 1} / {benchmark.global_config.trials}]", end=end, flush=True)
-                                result = subprocess.run(command,
-                                                        check=True,
-                                                        env=env,
-                                                        )
-
-                                if result.returncode != 0:
-                                        print("==> FAILED. Next test.")
-                                        break
-
         except ValidationError as e:
                 print("==> Validation error")
                 print(e)
@@ -169,14 +89,91 @@ def main(filename: str, executor: str, ask: bool = False):
                 print("==> Could not find program")
                 print(e)
                 raise SystemExit(1)
-        except subprocess.CalledProcessError as e:
-                print("==> Got non-zero error code")
-                print(e)
-                raise SystemExit(1)
-        except Exception as e:
-                print("==> Other exception")
-                print(e)
-                raise SystemExit(1)
+
+        start = datetime.datetime.now()
+        verbose = benchmark.global_config.output.verbose
+        output = pathlib.Path(benchmark.global_config.output.directory)
+        if ask and output.exists():
+                print(f"==> Output directory >{output}< exists. Overwrite? [y/n]")
+                overwrite = input()
+                if overwrite == "n":
+                        output = output.parent / f"results-{datetime.datetime.now().strftime('%Y%m%d-%H%M')}"
+                elif overwrite != "y":
+                        print("==> Unknown input. Abort")
+                        sys.exit()
+        else:
+                output = output.parent / f"results-{datetime.datetime.now().strftime('%Y%m%d-%H%M')}"
+
+        # Ensure the directory is created
+        output.mkdir(parents=True)
+        print(f"==> Created output directory: {output}")
+
+        for test in benchmark.test_suite:
+                end = "\n" if verbose else "\t\t\t\t"
+                print(f"==> Started {test.test_name}", end=end, flush=True)
+                cwd = pathlib.Path().cwd()
+                op = cwd / test.collective
+                op = cwd / op
+
+                nproc = str(benchmark.global_config.nproc)
+
+                if isinstance(test.messages_data, str):
+                        messages_data = test.messages_data
+                else:
+                        # Generate file based on test name and params
+                        data = test.messages_data.get("data")
+                        params = test.messages_data.get("params")
+                        params["savedir"] = str(output)
+
+                        if not data or not params:
+                                print("==> Invalid function parameters.")
+                                continue
+
+                        _, messages_data = generate_data_file(data, params)
+
+                        if "nproc" in params.keys():
+                                nproc = str(params["nproc"])
+
+                now = datetime.datetime.now()
+                diff = (now - start).total_seconds()
+                if diff > benchmark.global_config.max_runtime:
+                        print(f"==> Max runtime reached: EXIT")
+                        sys.exit()
+
+                foutput = output / f"{test.test_name}.csv"
+
+                executor_command = []
+                if executor == "srun":
+                        executor_command.append(executor)
+                        executor_command.append(f"-N{nproc}")
+                        executor_command.append("--ntasks-per-node=1")
+                elif executor == "mpirun":
+                        executor_command.append(executor)
+                        executor_command.append("-np")
+                        executor_command.append(nproc)
+
+                mpi_command = [str(op),
+                               "--fmessages", str(messages_data),
+                               "--foutput", str(foutput),
+                               "--timeout", str(test.timeout),
+                               "--verbose" if verbose else ""
+                               ]
+                command = executor_command + mpi_command
+
+                result = None
+                try:
+                        result = subprocess.run(command,
+                                                check=True,
+                                                env=env,
+                                                )
+                except subprocess.CalledProcessError as e:
+                        print("==> Got non-zero error code")
+                        print(e)
+                        raise SystemExit(1)
+
+                if result.returncode != 0:
+                        print("==> Got non-zero error code")
+                        raise SystemExit(1)
 
 
 if __name__ == "__main__":
