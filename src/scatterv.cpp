@@ -9,8 +9,7 @@
 #include <sstream>
 #include <vector>
 #include <string>
-#include <array>
-#include <map>
+#include <deque>
 
 #include <mpi.h>
 
@@ -28,7 +27,7 @@ class Scatterv {
         int *displs;
         int *sendcounts;
 
-        std::map<int, std::array<double, 2>> times;
+        std::deque<double> times;
 
         // This could also be a static member function
         static MPI_Datatype get_mpi_type() {
@@ -150,7 +149,8 @@ public:
                                      MPI_COMM_WORLD);
                         const double t_stop = MPI_Wtime();
 
-                        times[iter] = {t_start, t_stop};
+                        times.push_back(t_start);
+                        times.push_back(t_stop);
 
                         //MPI_Barrier(MPI_COMM_WORLD);
                         bool continue_loop = true;
@@ -184,7 +184,7 @@ public:
 
                 std::vector<double> lat(iter);
                 for (int i = 0; i <= iter; ++i) {
-                        lat[i] = times[i][1] - times[i][0];
+                        lat[i] = times[i+1] - times[i];
                 }
                 double min_local = *std::ranges::min_element(lat);
                 double max_local = *std::ranges::max_element(lat);
@@ -269,19 +269,19 @@ public:
                                 out_file << "Rank,Iteration,Starttime,Endtime\n";
                                 out_file.flush();
                         }
-                        for (const auto &[fst, snd] : times) {
+                        for (int i = 0; i < iter; ++i) {
                                 out_file << rank << ","
-                                         << fst << ","
-                                         << std::fixed << std::setprecision(15) << snd[0] << ","
-                                         << std::fixed << std::setprecision(15) << snd[1] << "\n";
+                                         << i << ","
+                                         << std::fixed << std::setprecision(15) << times[i] << ","
+                                         << std::fixed << std::setprecision(15) << times[i+1] << "\n";
                         }
                         out_file.close();
                 } else {
                         // Needs to be contiguous memory block
                         std::vector<double> vec_times(iter*2);
-                        for (const auto& [fst, snd] : times) {
-                                vec_times.push_back(snd[0]);
-                                vec_times.push_back(snd[1]);
+                        for (int i = 0; i < iter; ++i) {
+                                vec_times.push_back(times[i]);
+                                vec_times.push_back(times[i+1]);
                         }
                         MPI_Send(vec_times.data(), iter*2, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
                 }
@@ -303,11 +303,11 @@ public:
                                          0,
                                          MPI_COMM_WORLD,
                                          MPI_STATUS_IGNORE);
-                                for (int i = 1; i < iter; i=i+2) {
+                                for (int i = 0; i < iter; ++i) {
                                         out_file << r << ","
                                                  << i << ","
-                                                 << std::fixed << std::setprecision(15) << recv_vec_times[i-1] << ","
-                                                 << std::fixed << std::setprecision(15) << recv_vec_times[i] << "\n";
+                                                 << std::fixed << std::setprecision(15) << recv_vec_times[i] << ","
+                                                 << std::fixed << std::setprecision(15) << recv_vec_times[i+1] << "\n";
                                 }
                         }
                         out_file.close();
