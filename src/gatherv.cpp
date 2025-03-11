@@ -1,33 +1,67 @@
 #include <algorithm>
-#include <chrono>
 #include <cmath>
+#include <deque>
 #include <fstream>
 #include <getopt.h>
+#include <iomanip>
 #include <iostream>
 #include <numeric>
 #include <sstream>
 #include <vector>
-#include <iomanip>
-
+#include <string>
 
 #include <mpi.h>
 
+template <typename T>
 class Gatherv {
 
-        int rank{};
-        int csize{};
-        std::vector<double> sbuffer;
-        std::vector<double> rbuffer;
-        std::vector<double> timings;
-        std::vector<int> displs;
-        std::vector<int> sendcounts;
+        int rank;
+        int csize;
+        int iter;
+        int msg_size;
 
-        // Prepare messages
-        void setup(const std::string &filename)
+        T *sbuffer;
+        T *rbuffer;
+
+        int *displs;
+        int *sendcounts;
+
+        std::deque<double> times {};
+
+        // This could also be a static member function
+        static MPI_Datatype get_mpi_type() {
+                if constexpr (std::is_same_v<T, int>) {
+                        return MPI_INT;
+                } else if constexpr (std::is_same_v<T, double>) {
+                        return MPI_DOUBLE;
+                } else if constexpr (std::is_same_v<T, char>) {
+                        return MPI_CHAR;
+                }
+                // Return default or error
+                return MPI_DATATYPE_NULL;
+        }
+
+public:
+        explicit Gatherv(const std::string &filename)
         {
-                sendcounts.resize(csize, 0);
-                displs.resize(csize, 0);
+                rank = -1;
+                csize = -1;
+                iter = 0;
 
+                sbuffer = nullptr;
+                rbuffer = nullptr;
+                displs = nullptr;
+                sendcounts = nullptr;
+
+                MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+                MPI_Comm_size(MPI_COMM_WORLD, &csize);
+
+                if (rank == 0 && csize < 2) {
+                        std::cerr << "ERROR: Need more than one process." << std::endl;
+                        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+                }
+
+                sendcounts = new int[csize];
                 if (rank == 0) {
                         std::ifstream file(filename);
                         if (!file) {
@@ -54,59 +88,43 @@ class Gatherv {
                                 std::cerr << "ERROR: Number of columns "
                                           << "(" << row.size() << ") "
                                           << "does not match number of processes "
-                                          << "(" << csize << ")."
-                                          << std::endl;
+                                          << "(" << csize << ")." << std::endl;
                                 // @formatter:on
                                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
                         }
 
-                        rbuffer.resize(std::accumulate(row.begin(), row.end(), 0));
-                        sendcounts = row;
+
+                        msg_size = std::accumulate(row.begin(), row.end(), 0);
+                        sbuffer = new T[msg_size];
+                        int value = 1, offset = 0;
+                        for (int i : row) {
+                                std::fill_n(sbuffer + offset, i, static_cast<T>(value));
+                                offset += i;
+                                ++value;
+                        }
+
+                        for (int i = 0; i <= row.size(); ++i) {
+                                sendcounts[i] = row[i];
+                        }
                 }
 
-                // TODO: Consider just sending sendcounts[rank] to each process
-                MPI_Bcast(sendcounts.data(), csize, MPI_INT, 0, MPI_COMM_WORLD);
+                MPI_Bcast(sendcounts, csize, MPI_INT, 0, MPI_COMM_WORLD);
+                rbuffer = new T[sendcounts[rank]];
 
-                sbuffer.resize(sendcounts[rank]);
-                for (auto i = 0; i < sendcounts[rank]; ++i) {
-                        // TODO Need cast to double of rank
-                        sbuffer[i] = rank;
-                }
-
+                displs = new int[csize];
+                displs[0] = 0;
                 for (int i = 1; i < csize; ++i) {
                         displs[i] = displs[i - 1] + sendcounts[i - 1];
                 }
-
-                MPI_Barrier(MPI_COMM_WORLD);
         }
 
-public:
-        Gatherv()
-        {
-                MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-                MPI_Comm_size(MPI_COMM_WORLD, &csize);
-
-                if (rank == 0 && csize < 2) {
-                        std::cerr << "ERROR: Need more than one process." << std::endl;
-                        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-                }
+        ~Gatherv() {
+                delete[] sbuffer;
+                delete[] rbuffer;
         }
 
-        void run(const std::string &filename, const double max_seconds = 1, const bool verbose = false)
+        void run(const double max_seconds = 1, const bool verbose = false)
         {
-                setup(filename);
-
-                if (rank == 0 && verbose) {
-                        // @formatter:off
-                        std::cout << std::left
-                                        << std::setw(25) << "Messages (count)"
-                                        << std::setw(25) << "Avg Latency (s)"
-                                        << std::setw(25) << "Min Latency (s)"
-                                        << std::setw(25) << "Max Latency (s)"
-                                        << std::endl;
-                        // @formatter:on
-                }
-
                 // Global clock
                 double global_start_time = 0.0;
                 if (rank == 0) {
@@ -114,23 +132,24 @@ public:
                 }
                 MPI_Bcast(&global_start_time, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-                // TODO This could probably be improved
+                MPI_Barrier(MPI_COMM_WORLD);
                 while (true) {
                         const double t_start = MPI_Wtime();
-                        MPI_Gatherv(sbuffer.data(),
+                        MPI_Gatherv(sbuffer,
                                     sendcounts[rank],
-                                    MPI_DOUBLE,
-                                    rbuffer.data(),
-                                    sendcounts.data(),
-                                    displs.data(),
-                                    MPI_DOUBLE,
+                                    get_mpi_type(),
+                                    rbuffer,
+                                    sendcounts,
+                                    displs,
+                                    get_mpi_type(),
                                     0,
                                     MPI_COMM_WORLD);
                         const double t_stop = MPI_Wtime();
 
-                        timings.push_back(t_stop - t_start);
-                        MPI_Barrier(MPI_COMM_WORLD);
+                        times.push_back(t_start);
+                        times.push_back(t_stop);
 
+                        //MPI_Barrier(MPI_COMM_WORLD);
                         bool continue_loop = true;
                         if (rank == 0) {
                                 const double elapsed_time = MPI_Wtime() - global_start_time;
@@ -139,53 +158,102 @@ public:
                         MPI_Bcast(&continue_loop, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
                         if (!continue_loop)
                                 break;
+                        ++iter;
                 }
                 MPI_Barrier(MPI_COMM_WORLD);
 
-                const double min_local = *std::ranges::min_element(timings);
-                const double max_local = *std::ranges::max_element(timings);
-                const double avg_local = std::accumulate(timings.begin(), timings.end(), 0.0) / timings.size();
+                std::vector<int> call_times(csize);
+                const int times_size = static_cast<int>(times.size());
+                MPI_Gather(&times_size, 1, MPI_INT, call_times.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-                double min_time = 0.0, max_time = 0.0, avg_time = 0.0;
-                MPI_Reduce(&min_local, &min_time, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
-                MPI_Reduce(&max_local, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-                MPI_Reduce(&avg_local, &avg_time, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-                avg_time /= csize;
-
-                if (rank == 0 && verbose) {
+                if (rank == 0) {
                         // @formatter:off
-                        std::cout << std::left
-                                  << std::setw(25) << sbuffer.size()
-                                  << std::setw(25) << avg_time * 1e6
-                                  << std::setw(25) << min_time * 1e6
-                                  << std::setw(25) << max_time * 1e6
-                                  << std::endl
-                                  << std::endl;
+                        if (!std::ranges::all_of(call_times.begin(), call_times.end(), [&](const int x) {
+                                    return x == call_times[0];
+                            })) {
+                                std::cerr << "ERROR: Timing buffers mismatch: "
+                                             "Process has different number of iterations in starts"
+                                          << std::endl;
+                                MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+                        }
                         // @formatter:on
                 }
 
-                MPI_Barrier(MPI_COMM_WORLD);
-                // @formatter:off
-                // std::ostringstream oss;
-                // oss << std::left
-                //     << std::setw(25) << "Rank " + std::to_string(rank)
-                //     << std::setw(25) << avg_local * 1e6
-                //     << std::setw(25) << min_local * 1e6
-                //     << std::setw(25) << max_local * 1e6;
-                // std::cout << oss.str() << std::endl;
-                // @formatter:on
+                std::vector<double> lat(iter);
+                for (int i = 0; i <= iter; ++i) {
+                        lat[i] = times[i+1] - times[i];
+                }
+                double min_local = *std::ranges::min_element(lat);
+                double max_local = *std::ranges::max_element(lat);
+                double avg_local = std::accumulate(lat.begin(), lat.end(), 0.0) / iter;
 
+                std::vector min_locals(csize, 0.0);
+                std::vector max_locals(csize, 0.0);
+                std::vector avg_locals(csize, 0.0);
+
+                // Perform the reduction to gather global min, max, and average
+                MPI_Gather(&min_local, 1, MPI_DOUBLE, min_locals.data(), 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+                MPI_Gather(&max_local, 1, MPI_DOUBLE, max_locals.data(), 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+                MPI_Gather(&avg_local, 1, MPI_DOUBLE, avg_locals.data(), 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+
+                if (rank == 0 && verbose) {
+                        // Output local
+                        // @formatter:off
+                        std::ostringstream oss1;
+                        oss1 << std::left << std::setw(25) << ""
+                                         << std::setw(25) << "Avg Latency (μs)"
+                                         << std::setw(25) << "Min Latency (μs)"
+                                         << std::setw(25) << "Max Latency (μs)"
+                                         << std::endl;
+                        for (int i = 0; i < csize; ++i) {
+                                oss1 << std::left << std::setw(25) << "Rank " + std::to_string(i)
+                                                 << std::setw(25) << avg_locals[i] * 1e6
+                                                 << std::setw(25) << min_locals[i] * 1e6
+                                                 << std::setw(25) << max_locals[i] * 1e6
+                                                 << std::endl;
+                        }
+                        std::cout << oss1.str() << std::endl;
+                        // @formatter:on
+
+
+                        // Compute global min, max, average by iteration over all processes
+                        double min_global = *std::ranges::min_element(min_locals);
+                        double max_global = *std::ranges::max_element(max_locals);
+                        double avg_global = std::accumulate(avg_locals.begin(), avg_locals.end(), 0.0) / csize;
+
+
+                        // @formatter:off
+                        std::ostringstream oss2;
+                        oss2 << std::left << std::setw(25) << "Global messages count"
+                                         << std::setw(25) << "Avg Latency (μs)"
+                                         << std::setw(25) << "Min Latency (μs)"
+                                         << std::setw(25) << "Max Latency (μs)"
+                                         << std::setw(25) << "Iterations"
+                                         << std::endl
+                                         << std::setw(25) << msg_size
+                                         << std::setw(25) << avg_global * 1e6
+                                         << std::setw(25) << min_global * 1e6
+                                         << std::setw(25) << max_global * 1e6
+                                         << std::setw(25) << iter
+                                         << std::endl
+                                         << std::endl;
+                        std::cout << oss2.str() << std::endl;
+                        // @formatter:on
+
+                }
+
+                MPI_Barrier(MPI_COMM_WORLD);
         }
 
         // Save data to file
-        // TODO Needs improvement. Big file size too. If NFS, could use MPI_FILE
         void save_latencies(const std::string &filename, const bool verbose = false) const
         {
-                const size_t num_timings = timings.size();
-                std::vector<int> counts(csize);
-                MPI_Gather(&num_timings, 1, MPI_INT, counts.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
+                if (iter == 0) {
+                        std::cerr << "ERROR: Must run first before saving" << std::endl;
+                        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+                }
 
-                // Process 0 creates or opens the file and writes the header and its own timings to the file first
                 if (rank == 0) {
                         std::ofstream out_file(filename);
                         if (!out_file) {
@@ -195,17 +263,26 @@ public:
 
                         out_file.seekp(0, std::ios::end);
                         if (out_file.tellp() == 0) {
-                                out_file << "Rank,Iteration,Latency\n";
+                                out_file << "Rank,Iteration,Starttime,Endtime\n";
+                                out_file.flush();
                         }
-                        for (int i = 0; i < num_timings; ++i) {
-                                out_file << rank << "," << i << "," << timings[i] << "\n";
+                        for (int i = 0; i < iter; ++i) {
+                                out_file << rank << ","
+                                         << i << ","
+                                         << std::fixed << std::setprecision(15) << times[i] << ","
+                                         << std::fixed << std::setprecision(15) << times[i+1] << "\n";
                         }
                         out_file.close();
                 } else {
-                        MPI_Send(timings.data(), num_timings, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
+                        // Needs to be contiguous memory block
+                        std::vector<double> vec_times(iter*2);
+                        for (int i = 0; i < iter; ++i) {
+                                vec_times.push_back(times[i]);
+                                vec_times.push_back(times[i+1]);
+                        }
+                        MPI_Send(vec_times.data(), iter*2, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
                 }
 
-                // Process 0 receives and appends timings from all other processes
                 if (rank == 0) {
                         std::ofstream out_file(filename, std::ios::app);
                         if (!out_file) {
@@ -213,18 +290,21 @@ public:
                                 exit(EXIT_FAILURE);
                         }
 
-                        std::vector<double> recv_timings;
+                        std::vector<double> recv_vec_times(iter*2);
+                        recv_vec_times.reserve(times.size());
                         for (int r = 1; r < csize; ++r) {
-                                recv_timings.resize(counts[r]);
-                                MPI_Recv(recv_timings.data(),
-                                         counts[r],
+                                MPI_Recv(recv_vec_times.data(),
+                                         iter*2,
                                          MPI_DOUBLE,
                                          r,
                                          0,
                                          MPI_COMM_WORLD,
                                          MPI_STATUS_IGNORE);
-                                for (int i = 0; i < counts[r]; ++i) {
-                                        out_file << r << "," << i << "," << recv_timings[i] << "\n";
+                                for (int i = 0; i < iter; ++i) {
+                                        out_file << r << ","
+                                                 << i << ","
+                                                 << std::fixed << std::setprecision(15) << recv_vec_times[i] << ","
+                                                 << std::fixed << std::setprecision(15) << recv_vec_times[i+1] << "\n";
                                 }
                         }
                         out_file.close();
@@ -236,6 +316,7 @@ public:
         }
 };
 
+
 int main(int argc, char *argv[])
 {
         const option long_options[] = {{"help", no_argument, nullptr, 'h'},
@@ -243,25 +324,30 @@ int main(int argc, char *argv[])
                                        {"foutput", required_argument, nullptr, 'o'},
                                        {"timeout", required_argument, nullptr, 't'},
                                        {"verbose", no_argument, nullptr, 'v'},
+                                        {"dtype", required_argument, nullptr, 'd'},
                                        {nullptr, 0, nullptr, 0}};
 
         std::string fmessages = "default_messages.txt";
         std::string foutput = "default_output.txt";
         int timeout = 10;
         bool verbose = false;
+        std::string dtype = "double";
+
 
         int opt;
 
         while ((opt = getopt_long(argc, argv, "hm:o:n:t:v", long_options, nullptr)) != -1) {
                 switch (opt) {
                 case 'h':
+                        // TODO Multiple outputs
                         // @formatter:off
-                        std::cout << "Help: This program runs a MPI gatherv\n"
+                        std::cout << "Help: This program runs a MPI scatterv\n"
                                   << "Options:\n"
                                   << "  -h, --help            Show this help message\n"
                                   << "  -m, --fmessages FILE  Specify file with messages (default: default_messages.txt)\n"
                                   << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
                                   << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
+                                  << "  -d, --dtype TYPE      Specify char for MPI_CHAR, double MPI_DOUBLE or int for MPI_INT32 (default: double)\n"
                                   << "  -v, --verbose         Enable verbose mode\n";
                         // @formatter:on
                         return EXIT_SUCCESS;
@@ -270,6 +356,9 @@ int main(int argc, char *argv[])
                         break;
                 case 'o':
                         foutput = optarg;
+                        break;
+                case 'd':
+                        dtype = optarg;
                         break;
                 case 'v':
                         verbose = true;
@@ -286,12 +375,27 @@ int main(int argc, char *argv[])
 
         MPI_Init(&argc, &argv);
         try {
-                Gatherv benchmark;
-                benchmark.run(fmessages, timeout, verbose);
-                benchmark.save_latencies(foutput, verbose);
+                if (dtype == "double") {
+                        Gatherv<double> benchmark(fmessages);
+                        benchmark.run(timeout, verbose);
+                        benchmark.save_latencies(foutput, verbose);
+                } else if (dtype == "int") {
+                        Gatherv<int> benchmark(fmessages);
+                        benchmark.run(timeout, verbose);
+                        benchmark.save_latencies(foutput, verbose);
+                } else if (dtype == "char") {
+                        Gatherv<char> benchmark(fmessages);
+                        benchmark.run(timeout, verbose);
+                        benchmark.save_latencies(foutput, verbose);
+                } else {
+                        std::cerr << "Unknown dtype option: " << dtype << std::endl;
+                        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+                        return EXIT_FAILURE;
+                }
         } catch (const std::exception &e) {
                 std::cerr << "ERROR: " << e.what() << std::endl;
                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+                return EXIT_FAILURE;
         }
         MPI_Finalize();
         return EXIT_SUCCESS;
