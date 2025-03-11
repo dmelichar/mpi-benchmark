@@ -292,9 +292,10 @@ public:
                                 exit(EXIT_FAILURE);
                         }
 
-                        std::vector<double> recv_vec_times(iter*2);
-                        recv_vec_times.reserve(times.size());
+                        std::vector<double> recv_vec_times;
                         for (int r = 1; r < csize; ++r) {
+                                recv_vec_times.clear();
+                                recv_vec_times.reserve(iter*2);
                                 MPI_Recv(recv_vec_times.data(),
                                          iter*2,
                                          MPI_DOUBLE,
