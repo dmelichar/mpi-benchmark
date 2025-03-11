@@ -9,7 +9,6 @@
 #include <sstream>
 #include <vector>
 #include <string>
-#include <deque>
 
 #include <mpi.h>
 
@@ -27,7 +26,7 @@ class Scatterv {
         int *displs;
         int *sendcounts;
 
-        std::deque<double> times;
+        std::deque<double> times {};
 
         // This could also be a static member function
         static MPI_Datatype get_mpi_type() {

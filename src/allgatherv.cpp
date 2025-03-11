@@ -1,33 +1,77 @@
 #include <algorithm>
-#include <chrono>
 #include <cmath>
+#include <deque>
 #include <fstream>
 #include <getopt.h>
+#include <iomanip>
 #include <iostream>
 #include <numeric>
 #include <sstream>
 #include <vector>
-#include <iomanip>
-
+#include <string>
 
 #include <mpi.h>
 
-
+template <typename T>
 class Allgatherv {
-        int rank{};
-        int csize{};
-        std::vector<double> sbuffer;
-        std::vector<double> rbuffer;
-        std::vector<double> timings;
-        std::vector<int> displs;
-        std::vector<int> sendcounts;
+        int rank;
+        int csize;
+        int iter;
+        int msg_size;
 
-        // Prepare messages
-        void setup(const std::string &filename)
+        T *sbuffer;
+        T *rbuffer;
+
+        int *displs;
+        int *sendcounts;
+
+        std::deque<double> times {};
+
+        // This could also be a static member function
+        static MPI_Datatype get_mpi_type() {
+                if constexpr (std::is_same_v<T, int>) {
+                        return MPI_INT;
+                } else if constexpr (std::is_same_v<T, double>) {
+                        return MPI_DOUBLE;
+                } else if constexpr (std::is_same_v<T, char>) {
+                        return MPI_CHAR;
+                }
+                // Return default or error
+                return MPI_DATATYPE_NULL;
+        }
+
+
+public:
+        explicit Allgatherv()
         {
-                sendcounts.resize(csize, 0);
-                displs.resize(csize, 0);
+                rank = -1;
+                csize = -1;
+                iter = 0;
 
+                sbuffer = nullptr;
+                rbuffer = nullptr;
+                displs = nullptr;
+                sendcounts = nullptr;
+
+                MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+                MPI_Comm_size(MPI_COMM_WORLD, &csize);
+
+                if (rank == 0 && csize < 2) {
+                        std::cerr << "ERROR: Need more than one process." << std::endl;
+                        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+                }
+
+                MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+                MPI_Comm_size(MPI_COMM_WORLD, &csize);
+
+                if (rank == 0 && csize < 2) {
+                        std::cerr << "ERROR: Need more than one process." << std::endl;
+                        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+                }
+
+
+
+                sendcounts = new int[csize];
                 if (rank == 0) {
                         std::ifstream file(filename);
                         if (!file) {
@@ -64,8 +108,7 @@ class Allgatherv {
                         sendcounts = row;
                 }
 
-                // TODO: Consider just sending sendcounts[rank] to each process
-                MPI_Bcast(sendcounts.data(), csize, MPI_INT, 0, MPI_COMM_WORLD);
+                MPI_Bcast(sendcounts, csize, MPI_INT, 0, MPI_COMM_WORLD);
 
                 sbuffer.resize(sendcounts[rank]);
                 for (auto i = 0; i < sendcounts[rank]; ++i) {
@@ -75,22 +118,10 @@ class Allgatherv {
 
                 rbuffer.resize(std::accumulate(sendcounts.begin(), sendcounts.end(), 0));
 
+                displs = new int[csize];
+                displs[0] = 0;
                 for (int i = 1; i < csize; ++i) {
                         displs[i] = displs[i - 1] + sendcounts[i - 1];
-                }
-
-                MPI_Barrier(MPI_COMM_WORLD);
-        }
-
-public:
-        Allgatherv()
-        {
-                MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-                MPI_Comm_size(MPI_COMM_WORLD, &csize);
-
-                if (rank == 0 && csize < 2) {
-                        std::cerr << "ERROR: Need more than one process." << std::endl;
-                        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
                 }
         }
 
