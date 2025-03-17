@@ -7,8 +7,6 @@ import pathlib
 import seaborn as sns
 import tqdm
 
-from collections import defaultdict
-
 sns.set_style("whitegrid")
 
 def plot_dir(dirname: str):
@@ -42,7 +40,7 @@ def main(filename, ax):
         data=q95,
         x="Rank", 
         y="Latency", 
-        ax=axes[0]
+        ax=ax[0]
     )
     ax[0].set_title(f"{n}: Violin plot")
     ax[0].set_xlabel("Iteration")
@@ -56,7 +54,7 @@ def main(filename, ax):
         lw=1,
         err_style="band",
         errorbar="sd",
-        ax=axes[1]
+        ax=ax[1]
     )
     ax[1].set_title(f"{n}: Average Latency per iteration")
     ax[1].set_xlabel("Iteration")
@@ -67,6 +65,6 @@ if __name__ == "__main__":
         parser = argparse.ArgumentParser()
         parser.add_argument("filename")
         args = parser.parse_args()
-        fig, ax = plt.subplots(1, 2, figsize=(18, 6)))
+        fig, ax = plt.subplots(1, 2, figsize=(18, 6))
         main(args.filename, ax)
         fig.show()
