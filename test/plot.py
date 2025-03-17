@@ -5,7 +5,6 @@ import argparse
 import csv
 import pathlib
 import seaborn as sns
-import tqdm
 
 sns.set_style("whitegrid")
 
