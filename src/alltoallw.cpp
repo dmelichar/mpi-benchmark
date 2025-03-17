@@ -38,6 +38,7 @@ public:
                 rbuffer = nullptr;
                 displs = nullptr;
                 sendcounts = nullptr;
+                recvcounts = nullptr;
 
                 MPI_Comm_rank(MPI_COMM_WORLD, &rank);
                 MPI_Comm_size(MPI_COMM_WORLD, &csize);
@@ -66,6 +67,7 @@ public:
                 }
 
                 sendcounts = new int[csize];
+                recvcounts = new int[csize];
                 if (rank == 0) {
                         std::vector rows(csize, std::vector<int>(csize));
                         std::vector columns(csize, std::vector<int>(csize));
