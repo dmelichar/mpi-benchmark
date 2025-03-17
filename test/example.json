@@ -18,6 +18,18 @@
             "test_type": "latency",
             "collective": "scatterv",
             "messages_data": "custom.csv"
+        },
+        {
+            "test_name": "scatterv-equal-100-32p",
+            "test_type": "latency",
+            "collective": "scatterv",
+            "messages_data": {
+                "data": "equal",
+                "params": {
+                    "nproc": 32,
+                    "val": 100
+                }
+            }
         }
     ],
     "global_config": {
