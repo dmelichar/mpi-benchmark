@@ -1,0 +1,142 @@
+{
+    "benchmark_name": "test-allgatherv-alldist",
+    "test_suite": [
+        {
+            "test_name": "allgatherv-equal",
+            "test_type": "latency",
+            "collective": "allgatherv",
+            "messages_data": {
+                "data": "equal",
+                "params": {
+                    "nproc": 4,
+                    "val": 10
+                }
+            }
+        },
+        {
+            "test_name": "allgatherv-normal",
+            "test_type": "latency",
+            "collective": "allgatherv",
+            "messages_data": {
+                "data": "normal",
+                "params": {
+                    "nproc": 4
+                }
+            }
+        },
+        {
+            "test_name": "allgatherv-exponential",
+            "test_type": "latency",
+            "collective": "allgatherv",
+            "messages_data": {
+                "data": "exponential",
+                "params": {
+                    "nproc": 4
+                }
+            }
+        },
+        {
+            "test_name": "allgatherv-increasing",
+            "test_type": "latency",
+            "collective": "allgatherv",
+            "messages_data": {
+                "data": "increasing",
+                "params": {
+                    "nproc": 4,
+                    "avg": 3
+                }
+            }
+        },
+        {
+            "test_name": "allgatherv-decreasing",
+            "test_type": "latency",
+            "collective": "allgatherv",
+            "messages_data": {
+                "data": "decreasing",
+                "params": {
+                    "nproc": 4,
+                    "avg": 3
+                }
+            }
+        },
+        {
+            "test_name": "allgatherv-zipfian",
+            "test_type": "latency",
+            "collective": "allgatherv",
+            "messages_data": {
+                "data": "zipfian",
+                "params": {
+                    "nproc": 4
+                }
+            }
+        },
+        {
+            "test_name": "allgatherv-uniform",
+            "test_type": "latency",
+            "collective": "allgatherv",
+            "messages_data": {
+                "data": "uniform",
+                "params": {
+                    "nproc": 4,
+                    "avg": 3
+                }
+            }
+        },
+        {
+            "test_name": "allgatherv-bucket",
+            "test_type": "latency",
+            "collective": "allgatherv",
+            "messages_data": {
+                "data": "bucket",
+                "params": {
+                    "nproc": 4,
+                    "avg": 10
+                }
+            }
+        },
+        {
+            "test_name": "allgatherv-spikes",
+            "test_type": "latency",
+            "collective": "allgatherv",
+            "messages_data": {
+                "data": "spikes",
+                "params": {
+                    "nproc": 4,
+                    "avg": 3
+                }
+            }
+        },
+        {
+            "test_name": "allgatherv-alternating",
+            "test_type": "latency",
+            "collective": "allgatherv",
+            "messages_data": {
+                "data": "alternating",
+                "params": {
+                    "nproc": 4,
+                    "avg": 3
+                }
+            }
+        },
+        {
+            "test_name": "allgatherv-two-blocks",
+            "test_type": "latency",
+            "collective": "allgatherv",
+            "messages_data": {
+                "data": "two_blocks",
+                "params": {
+                    "nproc": 4,
+                    "avg": 3
+                }
+            }
+        }
+    ],
+    "global_config": {
+        "max_runtime": 3600,
+        "nproc": 4,
+        "output": {
+            "directory": "./results",
+            "verbose": true
+        }
+    }
+}

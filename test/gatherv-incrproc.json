@@ -1,0 +1,209 @@
+{
+    "benchmark_name": "test-gatherv-alldist",
+    "test_suite": [
+        {
+            "test_name": "gatherv-equal-4p-100",
+            "test_type": "latency",
+            "collective": "gatherv",
+            "messages_data": {
+                "data": "equal",
+                "params": {
+                    "nproc": 4,
+                    "val": 100
+                }
+            }
+        },
+        {
+            "test_name": "gatherv-equal-8p-100",
+            "test_type": "latency",
+            "collective": "gatherv",
+            "messages_data": {
+                "data": "equal",
+                "params": {
+                    "nproc": 8,
+                    "val": 100
+                }
+            }
+        },
+        {
+            "test_name": "gatherv-equal-16p-100",
+            "test_type": "latency",
+            "collective": "gatherv",
+            "messages_data": {
+                "data": "equal",
+                "params": {
+                    "nproc": 16,
+                    "val": 100
+                }
+            }
+        },
+        {
+            "test_name": "gatherv-equal-32p-100",
+            "test_type": "latency",
+            "collective": "gatherv",
+            "messages_data": {
+                "data": "equal",
+                "params": {
+                    "nproc": 32,
+                    "val": 100
+                }
+            }
+        },
+        {
+            "test_name": "gatherv-increasing-4p-100",
+            "test_type": "latency",
+            "collective": "gatherv",
+            "messages_data": {
+                "data": "increasing",
+                "params": {
+                    "nproc": 4,
+                    "avg": 100
+                }
+            }
+        },
+        {
+            "test_name": "gatherv-increasing-8p-100",
+            "test_type": "latency",
+            "collective": "gatherv",
+            "messages_data": {
+                "data": "increasing",
+                "params": {
+                    "nproc": 8,
+                    "avg": 100
+                }
+            }
+        },
+        {
+            "test_name": "gatherv-increasing-16p-100",
+            "test_type": "latency",
+            "collective": "gatherv",
+            "messages_data": {
+                "data": "increasing",
+                "params": {
+                    "nproc": 16,
+                    "avg": 100
+                }
+            }
+        },
+        {
+            "test_name": "gatherv-increasing-32p-100",
+            "test_type": "latency",
+            "collective": "gatherv",
+            "messages_data": {
+                "data": "increasing",
+                "params": {
+                    "nproc": 32,
+                    "avg": 100
+                }
+            }
+        },
+        {
+            "test_name": "gatherv-two_blocks-4p-100",
+            "test_type": "latency",
+            "collective": "gatherv",
+            "messages_data": {
+                "data": "two_blocks",
+                "params": {
+                    "nproc": 4,
+                    "avg": 100
+                }
+            }
+        },
+        {
+            "test_name": "gatherv-two_blocks-8p-100",
+            "test_type": "latency",
+            "collective": "gatherv",
+            "messages_data": {
+                "data": "two_blocks",
+                "params": {
+                    "nproc": 8,
+                    "avg": 100
+                }
+            }
+        },
+        {
+            "test_name": "gatherv-two_blocks-16p-100",
+            "test_type": "latency",
+            "collective": "gatherv",
+            "messages_data": {
+                "data": "two_blocks",
+                "params": {
+                    "nproc": 16,
+                    "avg": 100
+                }
+            }
+        },
+        {
+            "test_name": "gatherv-two_blocks-32p-100",
+            "test_type": "latency",
+            "collective": "gatherv",
+            "messages_data": {
+                "data": "two_blocks",
+                "params": {
+                    "nproc": 32,
+                    "avg": 100
+                }
+            }
+        },
+        {
+            "test_name": "gatherv-spikes-4p-100",
+            "test_type": "latency",
+            "collective": "gatherv",
+            "messages_data": {
+                "data": "spikes",
+                "params": {
+                    "nproc": 4,
+                    "avg": 100,
+                    "rho": 3
+                }
+            }
+        },
+        {
+            "test_name": "gatherv-spikes-8p-100",
+            "test_type": "latency",
+            "collective": "gatherv",
+            "messages_data": {
+                "data": "spikes",
+                "params": {
+                    "nproc": 8,
+                    "avg": 100,
+                    "rho": 3
+                }
+            }
+        },
+        {
+            "test_name": "gatherv-spikes-16p-100",
+            "test_type": "latency",
+            "collective": "gatherv",
+            "messages_data": {
+                "data": "spikes",
+                "params": {
+                    "nproc": 16,
+                    "avg": 100,
+                    "rho": 3
+                }
+            }
+        },
+        {
+            "test_name": "gatherv-spikes-32p-100",
+            "test_type": "latency",
+            "collective": "gatherv",
+            "messages_data": {
+                "data": "spikes",
+                "params": {
+                    "nproc": 32,
+                    "avg": 100,
+                    "rho": 3
+                }
+            }
+        }
+    ],
+    "global_config": {
+        "max_runtime": 3600,
+        "nproc": 4,
+        "output": {
+            "directory": "./results",
+            "verbose": true
+        }
+    }
+}
