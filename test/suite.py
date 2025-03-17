@@ -188,7 +188,7 @@ if __name__ == "__main__":
         parser.add_argument("filename")
         parser.add_argument("--ask", action='store_true', default=False, help="If set will ask for output directory name (default: False)")
         parser.add_argument("--compress", action='store_true', default=True, help="If set will create tar.xz for output directory (default=True)")
-        parser.add_argument("--executor", default="mpirun", default="mpirun", help="The executor to run: mpirun or srun (default: mpirun)")
+        parser.add_argument("--executor", default="mpirun", help="The executor to run: mpirun or srun (default: mpirun)")
         args = parser.parse_args()
 
         assert shutil.which(args.executor) is not None, f"{args.executor} was not found in path"
