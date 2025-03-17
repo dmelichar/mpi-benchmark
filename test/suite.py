@@ -174,15 +174,16 @@ def main(filename: str, executor: str = "mpirun", ask: bool = False, compress: b
                         raise SystemExit(1)
 
         if plot:
+            print(f"==> Plotting test results ... ", end="", flush=True)
             plot_dir(dirname=str(output))
-            print(f"==> Created plots")
+            print("Done")
             
         if compress:
-            print(f"==> Compressing ..")
+            print(f"==> Compressing {str(output)}.tar.gz ... ", end="", flush=True)
             tar = tarfile.open(f"{str(output)}.tar.gz", "w:xz")
             tar.add(output)
             tar.close()
-            print(f"==> Created {str(output)}.tar.gz")
+            print("Done")
 
         now = datetime.datetime.now()
         diff = (now - start).total_seconds()
