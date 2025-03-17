@@ -73,7 +73,12 @@ def generate_data_file(data: str, params: dict):
                 raise ValueError(f"Unknown test name {data}")
 
 
-def main(filename: str, executor: str = "mpirun", ask: bool = False, compress: bool = True, plot: bool = True):
+def main(filename: str,
+         executor: str = "mpirun",
+         ask: bool = False,
+         compress: bool = True,
+         plot: bool = True):
+
         start = datetime.datetime.now()
         benchmark = None
         try:
@@ -104,7 +109,8 @@ def main(filename: str, executor: str = "mpirun", ask: bool = False, compress: b
 
         # Ensure the directory is created
         output.mkdir(parents=True)
-        print(f"==> Created output directory: {output}")
+        if verbose:
+                print(f"==> Created output directory: {output}")
 
         for test in benchmark.test_suite:
                 now = datetime.datetime.now()
@@ -114,7 +120,8 @@ def main(filename: str, executor: str = "mpirun", ask: bool = False, compress: b
                         raise SystemExit(1)
                     
                 end = "\n" if verbose else "\t\t\t\t"
-                print(f"==> Started {test.test_name}", end=end, flush=True)
+                if verbose:
+                        print(f"==> Started {test.test_name}", end=end, flush=True)
                 cwd = pathlib.Path().cwd()
                 op = cwd / test.collective
                 op = cwd / op
@@ -174,20 +181,25 @@ def main(filename: str, executor: str = "mpirun", ask: bool = False, compress: b
                         raise SystemExit(1)
 
         if plot:
-            print(f"==> Plotting test results ... ", end="", flush=True)
+            if verbose:
+                    print(f"==> Plotting test results ... ", end="", flush=True)
             plot_dir(dirname=str(output))
-            print("Done")
+            if verbose:
+                    print("Done")
             
         if compress:
-            print(f"==> Compressing {str(output)}.tar.gz ... ", end="", flush=True)
+            if verbose:
+                print(f"==> Compressing {str(output)}.tar.gz ... ", end="", flush=True)
             tar = tarfile.open(f"{str(output)}.tar.gz", "w:xz")
             tar.add(output)
             tar.close()
-            print("Done")
+            if verbose:
+                print("Done")
 
         now = datetime.datetime.now()
         diff = (now - start).total_seconds()
-        print(f"==> Completed. Required {diff} seconds.")
+        if verbose:
+                print(f"==> Completed. Required {diff} seconds.")
     
 
 
