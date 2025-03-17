@@ -9,6 +9,7 @@ import subprocess
 import os
 import shutil
 import sys
+import tarfile
 
 from typing import List, Optional, Union
 
@@ -75,7 +76,7 @@ def generate_data_file(data: str, params: dict):
                 raise ValueError(f"Unknown test name {data}")
 
 
-def main(filename: str, executor: str, ask: bool = False):
+def main(filename: str, executor: str = "mpirun", ask: bool = False, compress: bool = True):
         benchmark = None
         try:
                 json_string = pathlib.Path(filename).read_text()
@@ -174,15 +175,22 @@ def main(filename: str, executor: str, ask: bool = False):
                 if result.returncode != 0:
                         print("==> Got non-zero error code")
                         raise SystemExit(1)
+        if compress:
+            tar = tarfile.open(f"{str(output).tar.gz}", "w:xz")
+            tar.add(output)
+            tar.close()
+            print(f"==> Created {str(output).tar.gz})
+    
 
 
 if __name__ == "__main__":
         parser = argparse.ArgumentParser()
         parser.add_argument("filename")
-        parser.add_argument("--ask", action='store_true', help="If false will create output directory")
-        parser.add_argument("--executor", default="mpirun", help="The executor to run: mpirun or srun")
+        parser.add_argument("--ask", action='store_true', default=False, help="If set will ask for output directory name (default: False)")
+        parser.add_argument("--compress", action='store_true', default=True, help="If set will create tar.xz for output directory (default=True)")
+        parser.add_argument("--executor", default="mpirun", default="mpirun", help="The executor to run: mpirun or srun (default: mpirun)")
         args = parser.parse_args()
 
         assert shutil.which(args.executor) is not None, f"{args.executor} was not found in path"
 
-        main(filename=args.filename, ask=args.ask, executor=args.executor)
+        main(filename=args.filename, ask=args.ask, executor=args.executor, compress=args.compress)
