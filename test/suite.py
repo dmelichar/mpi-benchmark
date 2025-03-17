@@ -1,7 +1,3 @@
-# This is basically a fancy mpirun wrapper.
-# Alternatively, one could have simple shell scripts that would
-# be the _testcases_ or in other words the different benchmarks to run
-
 import datetime
 import pathlib
 import argparse
@@ -17,6 +13,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from data import equal, normal, exponential, increasing, decreasing, zipfian, uniform, bucket, spikes, alternating, \
         two_blocks
+from plot import plot_dir
 
 
 class TestSuiteItem(BaseModel):
@@ -76,7 +73,8 @@ def generate_data_file(data: str, params: dict):
                 raise ValueError(f"Unknown test name {data}")
 
 
-def main(filename: str, executor: str = "mpirun", ask: bool = False, compress: bool = True):
+def main(filename: str, executor: str = "mpirun", ask: bool = False, compress: bool = True, plot: bool = True):
+        start = datetime.datetime.now()
         benchmark = None
         try:
                 json_string = pathlib.Path(filename).read_text()
@@ -91,7 +89,6 @@ def main(filename: str, executor: str = "mpirun", ask: bool = False, compress: b
                 print(e)
                 raise SystemExit(1)
 
-        start = datetime.datetime.now()
         verbose = benchmark.global_config.output.verbose
         output = pathlib.Path(benchmark.global_config.output.directory)
         if ask and output.exists():
@@ -110,6 +107,12 @@ def main(filename: str, executor: str = "mpirun", ask: bool = False, compress: b
         print(f"==> Created output directory: {output}")
 
         for test in benchmark.test_suite:
+                now = datetime.datetime.now()
+                diff = (now - start).total_seconds()
+                if diff > benchmark.global_config.max_runtime:
+                        print(f"==> Max runtime reached: EXIT")
+                        raise SystemExit(1)
+                    
                 end = "\n" if verbose else "\t\t\t\t"
                 print(f"==> Started {test.test_name}", end=end, flush=True)
                 cwd = pathlib.Path().cwd()
@@ -128,18 +131,12 @@ def main(filename: str, executor: str = "mpirun", ask: bool = False, compress: b
 
                         if not data or not params:
                                 print("==> Invalid function parameters.")
-                                continue
+                                raise SystemExit(1)
 
                         _, messages_data = generate_data_file(data, params)
 
                         if "nproc" in params.keys():
                                 nproc = str(params["nproc"])
-
-                now = datetime.datetime.now()
-                diff = (now - start).total_seconds()
-                if diff > benchmark.global_config.max_runtime:
-                        print(f"==> Max runtime reached: EXIT")
-                        sys.exit()
 
                 foutput = output / f"{test.test_name}.csv"
 
@@ -175,11 +172,21 @@ def main(filename: str, executor: str = "mpirun", ask: bool = False, compress: b
                 if result.returncode != 0:
                         print("==> Got non-zero error code")
                         raise SystemExit(1)
+
+        if plot:
+            plot_dir(dirname=str(output))
+            print(f"==> Created plots")
+            
         if compress:
+            print(f"==> Compressing ..")
             tar = tarfile.open(f"{str(output)}.tar.gz", "w:xz")
             tar.add(output)
             tar.close()
-            print(f"==> Created {str(output).tar.gz}")
+            print(f"==> Created {str(output)}.tar.gz")
+
+        now = datetime.datetime.now()
+        diff = (now - start).total_seconds()
+        print(f"==> Completed. Required {diff} seconds.")
     
 
 
@@ -188,6 +195,7 @@ if __name__ == "__main__":
         parser.add_argument("filename")
         parser.add_argument("--ask", action='store_true', default=False, help="If set will ask for output directory name (default: False)")
         parser.add_argument("--compress", action='store_true', default=True, help="If set will create tar.xz for output directory (default=True)")
+        parser.add_argument("--plot", action='store_true', default=True, help="If set will create plots of runs (default=True)")
         parser.add_argument("--executor", default="mpirun", help="The executor to run: mpirun or srun (default: mpirun)")
         args = parser.parse_args()
 
