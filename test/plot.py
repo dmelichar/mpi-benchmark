@@ -17,7 +17,8 @@ def plot_dir(dirname: str):
     fig, axes = plt.subplots(len(files), 2, figsize=(18, 6*len(files)))
     for f, ax in zip(files, axes):
         main(f, ax)
-    fig.tight_layout()
+
+    fig.subplots_adjust(left=0.1, right=0.9, top=0.95, bottom=0.05)
     fig.savefig(f"{dirname}/figure.png", dpi=300)
 
 
@@ -41,7 +42,8 @@ def main(filename, ax):
         y="Latency",
         ax=ax[0]
     )
-    ax[0].set_title(f"{n}: Violin plot")
+    ax[0].set_title(f"Violin plot: {n}")
+    ax[0].legend(loc="upper left")
     ax[0].set_xlabel("Iteration")
     ax[0].set_ylabel("Latency")
 
@@ -55,7 +57,8 @@ def main(filename, ax):
         errorbar="sd",
         ax=ax[1]
     )
-    ax[1].set_title(f"{n}: Average Latency per iteration")
+    ax[1].set_title(f"Average Latency per iteration: {n}")
+    ax[1].legend(loc="upper left")
     ax[1].set_xlabel("Iteration")
     ax[1].set_ylabel("Average Latency")
 
