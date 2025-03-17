@@ -17,7 +17,6 @@ class Scatterv {
 
         int rank;
         int csize;
-        int msg_size;
 
         T *sbuffer;
         T *rbuffer;
@@ -27,7 +26,6 @@ class Scatterv {
 
         std::deque<double> times {};
 
-        // This could also be a static member function
         static MPI_Datatype get_mpi_type() {
                 if constexpr (std::is_same_v<T, int>) {
                         return MPI_INT;
@@ -36,7 +34,6 @@ class Scatterv {
                 } else if constexpr (std::is_same_v<T, char>) {
                         return MPI_CHAR;
                 }
-                // Return default or error
                 return MPI_DATATYPE_NULL;
         }
 
@@ -93,7 +90,7 @@ public:
                         }
 
 
-                        msg_size = std::accumulate(row.begin(), row.end(), 0);
+                        int msg_size = std::accumulate(row.begin(), row.end(), 0);
                         sbuffer = new T[msg_size];
                         int value = 1, offset = 0;
                         for (int i : row) {
@@ -102,7 +99,7 @@ public:
                                 ++value;
                         }
 
-                        for (int i = 0; i <= row.size(); ++i) {
+                        for (int i = 0; i < row.size(); ++i) {
                                 sendcounts[i] = row[i];
                         }
                 }
@@ -120,6 +117,8 @@ public:
         ~Scatterv() {
                 delete[] sbuffer;
                 delete[] rbuffer;
+                delete displs;
+                delete sendcounts;
         }
 
         void run(const double max_seconds = 1, const bool verbose = false)
@@ -133,7 +132,6 @@ public:
 
                 MPI_Barrier(MPI_COMM_WORLD);
                 while (true) {
-                        //MPI_Barrier(MPI_COMM_WORLD);
                         const double t_start = MPI_Wtime();
                         MPI_Scatterv(sbuffer,
                                      sendcounts,
@@ -149,7 +147,6 @@ public:
                         times.push_back(t_start);
                         times.push_back(t_stop);
 
-                        //MPI_Barrier(MPI_COMM_WORLD);
                         bool continue_loop = true;
                         if (rank == 0) {
                                 const double elapsed_time = MPI_Wtime() - global_start_time;
@@ -161,15 +158,20 @@ public:
                 }
                 MPI_Barrier(MPI_COMM_WORLD);
 
+                const int iter = static_cast<int>(times.size()) / 2;
+
                 std::vector<int> call_times(csize);
-                const int times_size = static_cast<int>(times.size());
-                MPI_Gather(&times_size, 1, MPI_INT, call_times.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
+                MPI_Gather(&iter, 1, MPI_INT, call_times.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
 
                 if (rank == 0) {
                         // @formatter:off
-                        if (!std::ranges::all_of(call_times.begin(), call_times.end(), [&](const int x) {
+                        if (!std::ranges::all_of(
+                                call_times.begin(),
+                                call_times.end(),
+                                [&](const int x)
+                                {
                                     return x == call_times[0];
-                            })) {
+                                })) {
                                 std::cerr << "ERROR: Timing buffers mismatch: "
                                              "Process has different number of iterations in starts"
                                           << std::endl;
@@ -178,17 +180,18 @@ public:
                         // @formatter:on
                 }
 
-                std::vector<double> lat(times.size());
-                for (int i = 0; i <= times.size() / 2; ++i) {
+                std::vector<double> lat(iter);
+                for (int i = 0; i <= iter; ++i) {
                         lat[i] = times[i+1] - times[i];
                 }
+
                 double min_local = *std::ranges::min_element(lat);
                 double max_local = *std::ranges::max_element(lat);
-                double avg_local = std::accumulate(lat.begin(), lat.end(), 0.0) / (times.size()  / 2);
+                double avg_local = std::accumulate(lat.begin(), lat.end(), 0.0) / iter;
 
-                std::vector min_locals(csize, 0.0);
-                std::vector max_locals(csize, 0.0);
-                std::vector avg_locals(csize, 0.0);
+                std::vector<double> min_locals(csize);
+                std::vector<double> max_locals(csize);
+                std::vector<double> avg_locals(csize);
 
                 // Perform the reduction to gather global min, max, and average
                 MPI_Gather(&min_local, 1, MPI_DOUBLE, min_locals.data(), 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
@@ -222,6 +225,10 @@ public:
                         double avg_global = std::accumulate(avg_locals.begin(), avg_locals.end(), 0.0) / csize;
 
 
+                        int msg_size = 0;
+                        for (int i = 0; i < csize; ++i) {
+                                msg_size += sendcounts[i];
+                        }
                         // @formatter:off
                         std::ostringstream oss2;
                         oss2 << std::left << std::setw(25) << "Global messages count"
@@ -234,7 +241,7 @@ public:
                                          << std::setw(25) << avg_global * 1e6
                                          << std::setw(25) << min_global * 1e6
                                          << std::setw(25) << max_global * 1e6
-                                         << std::setw(25) << times.size() / 2
+                                         << std::setw(25) << iter
                                          << std::endl
                                          << std::endl;
                         std::cout << oss2.str() << std::endl;
@@ -253,6 +260,8 @@ public:
                         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
                 }
 
+                const int iter = static_cast<int>(times.size()) / 2;
+
                 if (rank == 0) {
                         std::ofstream out_file(filename);
                         if (!out_file) {
@@ -265,19 +274,18 @@ public:
                                 out_file << "Rank,Iteration,Starttime,Endtime\n";
                                 out_file.flush();
                         }
-                        for (int i = 0; i < times.size()  / 2; ++i) {
+                        for (int i = 0; i < iter; ++i) {
                                 out_file << rank << ","
                                          << i << ","
-                                         << std::fixed << std::setprecision(15) << times[i] << ","
-                                         << std::fixed << std::setprecision(15) << times[i+1] << "\n";
+                                         << std::fixed << std::setprecision(8) << times[i] << ","
+                                         << std::fixed << std::setprecision(8) << times[i+1] << "\n";
                         }
                         out_file.close();
                 } else {
                         // Needs to be contiguous memory block
                         std::vector<double> vec_times(times.size());
-                        for (int i = 0; i < times.size() / 2; ++i) {
-                                vec_times.push_back(times[i]);
-                                vec_times.push_back(times[i+1]);
+                        for (int i = 0; i < times.size(); ++i) {
+                                vec_times[i] = times[i];
                         }
                         MPI_Send(vec_times.data(), times.size(), MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
                 }
@@ -298,11 +306,12 @@ public:
                                          0,
                                          MPI_COMM_WORLD,
                                          MPI_STATUS_IGNORE);
-                                for (int i = 0; i < times.size() / 2; ++i) {
+
+                                for (int i = 0; i < iter; ++i) {
                                         out_file << r << ","
                                                  << i << ","
-                                                 << std::fixed << std::setprecision(15) << recv_vec_times[i] << ","
-                                                 << std::fixed << std::setprecision(15) << recv_vec_times[i+1] << "\n";
+                                                 << std::fixed << std::setprecision(8) << recv_vec_times[i] << ","
+                                                 << std::fixed << std::setprecision(8) << recv_vec_times[i+1] << "\n";
                                 }
                         }
                         out_file.close();
@@ -334,7 +343,7 @@ int main(int argc, char *argv[])
 
         int opt;
 
-        while ((opt = getopt_long(argc, argv, "hm:o:n:t:v", long_options, nullptr)) != -1) {
+        while ((opt = getopt_long(argc, argv, "hm:o:n:t:d:v", long_options, nullptr)) != -1) {
                 switch (opt) {
                 case 'h':
                         // @formatter:off
