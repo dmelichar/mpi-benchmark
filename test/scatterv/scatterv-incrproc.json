@@ -203,7 +203,7 @@
         "nproc": 4,
         "output": {
             "directory": "./results",
-            "verbose": true
+            "verbose": "true"
         }
     }
 }

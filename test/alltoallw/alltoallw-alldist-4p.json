@@ -1,10 +1,10 @@
 {
-    "benchmark_name": "test-scatterv-alldist",
+    "benchmark_name": "test-alltoallw-alldist",
     "test_suite": [
         {
-            "test_name": "scatterv-equal",
+            "test_name": "alltoallw-equal",
             "test_type": "latency",
-            "collective": "scatterv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "equal",
                 "params": {
@@ -14,9 +14,9 @@
             }
         },
         {
-            "test_name": "scatterv-normal",
+            "test_name": "alltoallw-normal",
             "test_type": "latency",
-            "collective": "scatterv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "normal",
                 "params": {
@@ -25,9 +25,9 @@
             }
         },
         {
-            "test_name": "scatterv-exponential",
+            "test_name": "alltoallw-exponential",
             "test_type": "latency",
-            "collective": "scatterv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "exponential",
                 "params": {
@@ -36,9 +36,9 @@
             }
         },
         {
-            "test_name": "scatterv-increasing",
+            "test_name": "alltoallw-increasing",
             "test_type": "latency",
-            "collective": "scatterv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "increasing",
                 "params": {
@@ -48,9 +48,9 @@
             }
         },
         {
-            "test_name": "scatterv-decreasing",
+            "test_name": "alltoallw-decreasing",
             "test_type": "latency",
-            "collective": "scatterv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "decreasing",
                 "params": {
@@ -60,9 +60,9 @@
             }
         },
         {
-            "test_name": "scatterv-zipfian",
+            "test_name": "alltoallw-zipfian",
             "test_type": "latency",
-            "collective": "scatterv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "zipfian",
                 "params": {
@@ -71,9 +71,9 @@
             }
         },
         {
-            "test_name": "scatterv-uniform",
+            "test_name": "alltoallw-uniform",
             "test_type": "latency",
-            "collective": "scatterv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "uniform",
                 "params": {
@@ -83,9 +83,9 @@
             }
         },
         {
-            "test_name": "scatterv-bucket",
+            "test_name": "alltoallw-bucket",
             "test_type": "latency",
-            "collective": "scatterv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "bucket",
                 "params": {
@@ -95,9 +95,9 @@
             }
         },
         {
-            "test_name": "scatterv-spikes",
+            "test_name": "alltoallw-spikes",
             "test_type": "latency",
-            "collective": "scatterv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "spikes",
                 "params": {
@@ -107,9 +107,9 @@
             }
         },
         {
-            "test_name": "scatterv-alternating",
+            "test_name": "alltoallw-alternating",
             "test_type": "latency",
-            "collective": "scatterv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "alternating",
                 "params": {
@@ -119,9 +119,9 @@
             }
         },
         {
-            "test_name": "scatterv-two-blocks",
+            "test_name": "alltoallw-two-blocks",
             "test_type": "latency",
-            "collective": "scatterv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "two_blocks",
                 "params": {
@@ -136,7 +136,7 @@
         "nproc": 4,
         "output": {
             "directory": "./results",
-            "verbose": true
+            "verbose": "true"
         }
     }
 }

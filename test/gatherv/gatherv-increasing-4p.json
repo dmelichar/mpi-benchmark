@@ -1,0 +1,25 @@
+{
+  "benchmark_name": "test-gatherv-increasing-4p",
+  "test_suite": [
+    {
+      "test_name": "gatherv-increasing",
+      "test_type": "latency",
+      "collective": "gatherv",
+      "messages_data": {
+        "data": "increasing",
+        "params": {
+          "nproc": 4,
+          "avg": 3
+        }
+      }
+    }
+  ],
+  "global_config": {
+    "max_runtime": 3600,
+    "output": {
+      "directory": "./results",
+      "verbose": "false"
+    }
+  }
+}
+

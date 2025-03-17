@@ -1,0 +1,24 @@
+{
+  "benchmark_name": "test-alltoallw-normal-4p",
+  "test_suite": [
+    {
+      "test_name": "alltoallw-normal",
+      "test_type": "latency",
+      "collective": "alltoallw",
+      "messages_data": {
+        "data": "normal",
+        "params": {
+          "nproc": 4
+        }
+      }
+    }
+  ],
+  "global_config": {
+    "max_runtime": 3600,
+    "output": {
+      "directory": "./results",
+      "verbose": "false"
+    }
+  }
+}
+

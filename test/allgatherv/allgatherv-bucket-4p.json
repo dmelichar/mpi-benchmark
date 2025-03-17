@@ -1,0 +1,25 @@
+{
+  "benchmark_name": "test-allgatherv-bucket-4p",
+  "test_suite": [
+    {
+      "test_name": "allgatherv-bucket",
+      "test_type": "latency",
+      "collective": "allgatherv",
+      "messages_data": {
+        "data": "bucket",
+        "params": {
+          "nproc": 4,
+          "avg": 10
+        }
+      }
+    }
+  ],
+  "global_config": {
+    "max_runtime": 3600,
+    "output": {
+      "directory": "./results",
+      "verbose": "false"
+    }
+  }
+}
+

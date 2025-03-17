@@ -1,10 +1,10 @@
 {
-    "benchmark_name": "test-allgatherv-alldist",
+    "benchmark_name": "test-alltoallw-alldist",
     "test_suite": [
         {
-            "test_name": "allgatherv-equal-4p-100",
+            "test_name": "alltoallw-equal-4p-100",
             "test_type": "latency",
-            "collective": "allgatherv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "equal",
                 "params": {
@@ -14,9 +14,9 @@
             }
         },
         {
-            "test_name": "allgatherv-equal-8p-100",
+            "test_name": "alltoallw-equal-8p-100",
             "test_type": "latency",
-            "collective": "allgatherv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "equal",
                 "params": {
@@ -26,9 +26,9 @@
             }
         },
         {
-            "test_name": "allgatherv-equal-16p-100",
+            "test_name": "alltoallw-equal-16p-100",
             "test_type": "latency",
-            "collective": "allgatherv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "equal",
                 "params": {
@@ -38,9 +38,9 @@
             }
         },
         {
-            "test_name": "allgatherv-equal-32p-100",
+            "test_name": "alltoallw-equal-32p-100",
             "test_type": "latency",
-            "collective": "allgatherv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "equal",
                 "params": {
@@ -50,9 +50,9 @@
             }
         },
         {
-            "test_name": "allgatherv-increasing-4p-100",
+            "test_name": "alltoallw-increasing-4p-100",
             "test_type": "latency",
-            "collective": "allgatherv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "increasing",
                 "params": {
@@ -62,9 +62,9 @@
             }
         },
         {
-            "test_name": "allgatherv-increasing-8p-100",
+            "test_name": "alltoallw-increasing-8p-100",
             "test_type": "latency",
-            "collective": "allgatherv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "increasing",
                 "params": {
@@ -74,9 +74,9 @@
             }
         },
         {
-            "test_name": "allgatherv-increasing-16p-100",
+            "test_name": "alltoallw-increasing-16p-100",
             "test_type": "latency",
-            "collective": "allgatherv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "increasing",
                 "params": {
@@ -86,9 +86,9 @@
             }
         },
         {
-            "test_name": "allgatherv-increasing-32p-100",
+            "test_name": "alltoallw-increasing-32p-100",
             "test_type": "latency",
-            "collective": "allgatherv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "increasing",
                 "params": {
@@ -98,9 +98,9 @@
             }
         },
         {
-            "test_name": "allgatherv-two_blocks-4p-100",
+            "test_name": "alltoallw-two_blocks-4p-100",
             "test_type": "latency",
-            "collective": "allgatherv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "two_blocks",
                 "params": {
@@ -110,9 +110,9 @@
             }
         },
         {
-            "test_name": "allgatherv-two_blocks-8p-100",
+            "test_name": "alltoallw-two_blocks-8p-100",
             "test_type": "latency",
-            "collective": "allgatherv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "two_blocks",
                 "params": {
@@ -122,9 +122,9 @@
             }
         },
         {
-            "test_name": "allgatherv-two_blocks-16p-100",
+            "test_name": "alltoallw-two_blocks-16p-100",
             "test_type": "latency",
-            "collective": "allgatherv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "two_blocks",
                 "params": {
@@ -134,9 +134,9 @@
             }
         },
         {
-            "test_name": "allgatherv-two_blocks-32p-100",
+            "test_name": "alltoallw-two_blocks-32p-100",
             "test_type": "latency",
-            "collective": "allgatherv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "two_blocks",
                 "params": {
@@ -146,9 +146,9 @@
             }
         },
         {
-            "test_name": "allgatherv-spikes-4p-100",
+            "test_name": "alltoallw-spikes-4p-100",
             "test_type": "latency",
-            "collective": "allgatherv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "spikes",
                 "params": {
@@ -159,9 +159,9 @@
             }
         },
         {
-            "test_name": "allgatherv-spikes-8p-100",
+            "test_name": "alltoallw-spikes-8p-100",
             "test_type": "latency",
-            "collective": "allgatherv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "spikes",
                 "params": {
@@ -172,9 +172,9 @@
             }
         },
         {
-            "test_name": "allgatherv-spikes-16p-100",
+            "test_name": "alltoallw-spikes-16p-100",
             "test_type": "latency",
-            "collective": "allgatherv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "spikes",
                 "params": {
@@ -185,9 +185,9 @@
             }
         },
         {
-            "test_name": "allgatherv-spikes-32p-100",
+            "test_name": "alltoallw-spikes-32p-100",
             "test_type": "latency",
-            "collective": "allgatherv",
+            "collective": "alltoallw",
             "messages_data": {
                 "data": "spikes",
                 "params": {
@@ -203,7 +203,7 @@
         "nproc": 4,
         "output": {
             "directory": "./results",
-            "verbose": true
+            "verbose": "true"
         }
     }
 }

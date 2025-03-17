@@ -1,0 +1,24 @@
+{
+  "benchmark_name": "test-gatherv-normal-4p",
+  "test_suite": [
+    {
+      "test_name": "gatherv-normal",
+      "test_type": "latency",
+      "collective": "gatherv",
+      "messages_data": {
+        "data": "normal",
+        "params": {
+          "nproc": 4
+        }
+      }
+    }
+  ],
+  "global_config": {
+    "max_runtime": 3600,
+    "output": {
+      "directory": "./results",
+      "verbose": "false"
+    }
+  }
+}
+

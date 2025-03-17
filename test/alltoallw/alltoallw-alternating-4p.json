@@ -1,0 +1,25 @@
+{
+  "benchmark_name": "test-alltoallw-alternating-4p",
+  "test_suite": [
+    {
+      "test_name": "alltoallw-alternating",
+      "test_type": "latency",
+      "collective": "alltoallw",
+      "messages_data": {
+        "data": "alternating",
+        "params": {
+          "nproc": 4,
+          "avg": 3
+        }
+      }
+    }
+  ],
+  "global_config": {
+    "max_runtime": 3600,
+    "output": {
+      "directory": "./results",
+      "verbose": "false"
+    }
+  }
+}
+

@@ -1,0 +1,25 @@
+{
+  "benchmark_name": "test-allgatherv-decreasing-4p",
+  "test_suite": [
+    {
+      "test_name": "allgatherv-decreasing",
+      "test_type": "latency",
+      "collective": "allgatherv",
+      "messages_data": {
+        "data": "decreasing",
+        "params": {
+          "nproc": 4,
+          "avg": 3
+        }
+      }
+    }
+  ],
+  "global_config": {
+    "max_runtime": 3600,
+    "output": {
+      "directory": "./results",
+      "verbose": "false"
+    }
+  }
+}
+

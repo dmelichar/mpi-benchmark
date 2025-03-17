@@ -7,13 +7,15 @@ import shutil
 import sys
 import tarfile
 
+import time
+
 from typing import List, Optional, Union
 
 from pydantic import BaseModel, Field, ValidationError
 
+from plot import plot_dir
 from data import equal, normal, exponential, increasing, decreasing, zipfian, uniform, bucket, spikes, alternating, \
         two_blocks
-from plot import plot_dir
 
 
 class TestSuiteItem(BaseModel):
@@ -25,21 +27,20 @@ class TestSuiteItem(BaseModel):
 
 
 class GlobalConfigOutput(BaseModel):
-        directory: str = Field(default="./results", description="Directory to save results and parameters to")
-        verbose: bool = Field(default=False, description="Verbose output")
+        directory: Optional[str] = Field(default=None, description="Directory to save results and parameters to")
+        verbose: Optional[bool] = Field(default=None, description="Verbose output")
 
 
 class GlobalConfig(BaseModel):
-        max_runtime: int = Field(ge=0, description="Maximum runtime in seconds for each test")
-        nproc: int = Field(ge=2, description="Number of processes")
-        trials: Optional[int] = Field(default=1, description="Number of times to run all tests")
-        output: GlobalConfigOutput = None
+        max_runtime: Optional[int] = Field(default=None, ge=0, description="Maximum runtime in seconds for each test")
+        nproc: Optional[int] = Field(default=None, ge=2, description="Number of processes")
+        output: Optional[GlobalConfigOutput] = None
 
 
 class OpenMPIBenchmarkConfig(BaseModel):
         benchmark_name: str = Field(description="Name of the benchmark configuration")
         test_suite: List[TestSuiteItem]
-        global_config: GlobalConfig
+        global_config: Optional[GlobalConfig]
 
         class Config:
                 str_min_length = 1  # Ensures strings are not empty
@@ -72,19 +73,10 @@ def generate_data_file(data: str, params: dict):
         else:
                 raise ValueError(f"Unknown test name {data}")
 
-
-def main(filename: str,
-         executor: str = "mpirun",
-         ask: bool = False,
-         compress: bool = True,
-         plot: bool = True):
-
-        start = datetime.datetime.now()
-        benchmark = None
+def parse_file(filename: str):
         try:
                 json_string = pathlib.Path(filename).read_text()
-                benchmark = OpenMPIBenchmarkConfig.model_validate_json(json_string, strict=True)
-                env = os.environ.copy()
+                return OpenMPIBenchmarkConfig.model_validate_json(json_string, strict=False)
         except ValidationError as e:
                 print("==> Validation error")
                 print(e)
@@ -92,10 +84,13 @@ def main(filename: str,
         except FileNotFoundError as e:
                 print("==> Could not find program")
                 print(e)
-                raise SystemExit(1)
+        raise SystemExit(1)
 
-        verbose = benchmark.global_config.output.verbose
-        output = pathlib.Path(benchmark.global_config.output.directory)
+def create_output(dirname: str, ask: bool, no_save: bool, verbose: bool):
+        if no_save:
+                return pathlib.Path().cwd()
+
+        output = pathlib.Path(dirname)
         if ask and output.exists():
                 print(f"==> Output directory >{output}< exists. Overwrite? [y/n]")
                 overwrite = input()
@@ -107,10 +102,53 @@ def main(filename: str,
         else:
                 output = output.parent / f"results-{datetime.datetime.now().strftime('%Y%m%d-%H%M')}"
 
-        # Ensure the directory is created
         output.mkdir(parents=True)
         if verbose:
                 print(f"==> Created output directory: {output}")
+        return output
+
+def parse_message_data(messages_data: str | dict, output: pathlib.Path):
+        if isinstance(messages_data, str):
+                # Exisiting file
+                return messages_data
+        else:
+                # Generate file based on test name and params
+                data = messages_data.get("data")
+                params = messages_data.get("params")
+                params["savedir"] = output
+
+                if not data or not params:
+                        print("==> Invalid function parameters.")
+                        raise SystemExit(1)
+
+                _, messages_data = generate_data_file(data, params)
+                return messages_data
+
+def run_test(command):
+        env = os.environ.copy()
+        try:
+                subprocess.run(command, check=True, env=env)
+        except subprocess.CalledProcessError as e:
+                print("==> Got non-zero error code")
+                print(e)
+                raise SystemExit(1)
+
+def main(filename: str,
+         executor: str,
+         wd: str = ".",
+         ask: bool = False,
+         compress: bool = True,
+         plot: bool = True):
+
+        no_save = not (compress or plot)
+        start = datetime.datetime.now()
+
+        benchmark = parse_file(filename)
+        verbose = benchmark.global_config.output.verbose
+        nproc = benchmark.global_config.nproc
+
+        cwd = pathlib.Path(wd)
+        output = create_output(dirname=benchmark.global_config.output.directory, ask=ask, no_save=no_save, verbose=verbose)
 
         for test in benchmark.test_suite:
                 now = datetime.datetime.now()
@@ -118,46 +156,37 @@ def main(filename: str,
                 if diff > benchmark.global_config.max_runtime:
                         print(f"==> Max runtime reached: EXIT")
                         raise SystemExit(1)
-                    
+
+                # Override globally set nproc if set in test case
+                if isinstance(test.messages_data, dict) and "nproc" in test.messages_data.get("params").keys():
+                        nproc = test.messages_data.get("params")["nproc"]
+                elif nproc is None:
+                        print("==> Number of processes required.")
+                        raise SystemExit(1)
+
                 end = "\n" if verbose else "\t\t\t\t"
                 if verbose:
                         print(f"==> Started {test.test_name}", end=end, flush=True)
-                cwd = pathlib.Path().cwd()
-                op = cwd / test.collective
-                op = cwd / op
 
-                nproc = str(benchmark.global_config.nproc)
+                # Get or create message data
+                messages_data = parse_message_data(messages_data=test.messages_data, output=output)
 
-                if isinstance(test.messages_data, str):
-                        messages_data = test.messages_data
-                else:
-                        # Generate file based on test name and params
-                        data = test.messages_data.get("data")
-                        params = test.messages_data.get("params")
-                        params["savedir"] = str(output)
+                # Name of file where latencies will be saved to
+                foutput = output / f"{test.test_name}.csv" if not no_save else f"{test.test_name}.csv"
 
-                        if not data or not params:
-                                print("==> Invalid function parameters.")
-                                raise SystemExit(1)
-
-                        _, messages_data = generate_data_file(data, params)
-
-                        if "nproc" in params.keys():
-                                nproc = str(params["nproc"])
-
-                foutput = output / f"{test.test_name}.csv"
-
+                # Build command to run
+                mpi_call = cwd.absolute() / test.collective
                 executor_command = []
-                if executor == "srun":
-                        executor_command.append(executor)
-                        executor_command.append(f"-N{nproc}")
+                if "srun" in executor:
+                        executor_command.append(str(executor))
+                        executor_command.append(f"-N{str(nproc)}")
                         executor_command.append("--ntasks-per-node=1")
-                elif executor == "mpirun":
-                        executor_command.append(executor)
+                elif "mpirun" in executor:
+                        executor_command.append(str(executor))
                         executor_command.append("-np")
-                        executor_command.append(nproc)
+                        executor_command.append(str(nproc))
 
-                mpi_command = [str(op),
+                mpi_command = [str(mpi_call),
                                "--fmessages", str(messages_data),
                                "--foutput", str(foutput),
                                "--timeout", str(test.timeout),
@@ -165,53 +194,52 @@ def main(filename: str,
                                ]
                 command = executor_command + mpi_command
 
-                result = None
-                try:
-                        result = subprocess.run(command,
-                                                check=True,
-                                                env=env,
-                                                )
-                except subprocess.CalledProcessError as e:
-                        print("==> Got non-zero error code")
-                        print(e)
-                        raise SystemExit(1)
+                # Execute the command
+                run_test(command)
 
-                if result.returncode != 0:
-                        print("==> Got non-zero error code")
-                        raise SystemExit(1)
+                # Remove temporary messages file
+                if no_save:
+                        pathlib.Path(messages_data).unlink()
+                        pathlib.Path(foutput).unlink()
 
         if plot:
-            if verbose:
-                    print(f"==> Plotting test results ... ", end="", flush=True)
-            plot_dir(dirname=str(output))
-            if verbose:
-                    print("Done")
-            
-        if compress:
-            if verbose:
-                print(f"==> Compressing {str(output)}.tar.gz ... ", end="", flush=True)
-            tar = tarfile.open(f"{str(output)}.tar.gz", "w:xz")
-            tar.add(output)
-            tar.close()
-            if verbose:
-                print("Done")
+                if verbose:
+                        print(f"==> Plotting test results ... ", end="", flush=True)
+                plot_dir(dirname=str(output))
+                if verbose:
+                        print("Done")
 
-        now = datetime.datetime.now()
-        diff = (now - start).total_seconds()
+        if compress:
+                if verbose:
+                        print(f"==> Compressing {str(output)}.tar.gz ... ", end="", flush=True)
+                tar = tarfile.open(f"{str(output)}.tar.gz", "w:xz")
+                tar.add(output)
+                tar.close()
+                if verbose:
+                        print("Done")
+
         if verbose:
+                now = datetime.datetime.now()
+                diff = (now - start).total_seconds()
                 print(f"==> Completed. Required {diff} seconds.")
-    
 
 
 if __name__ == "__main__":
         parser = argparse.ArgumentParser()
         parser.add_argument("filename")
         parser.add_argument("--ask", action='store_true', default=False, help="If set will ask for output directory name (default: False)")
-        parser.add_argument("--compress", action='store_true', default=True, help="If set will create tar.xz for output directory (default=True)")
-        parser.add_argument("--plot", action='store_true', default=True, help="If set will create plots of runs (default=True)")
-        parser.add_argument("--executor", default="mpirun", help="The executor to run: mpirun or srun (default: mpirun)")
+        parser.add_argument("--no-compress", action='store_false', default=True, help="If set will not create tar.xz for output directory (default=False)")
+        parser.add_argument("--no-plot", action='store_false', default=True, help="If set will not create plots of runs (default=False)")
+        parser.add_argument("--executor", default="mpirun",  help="The executor to run: mpirun or srun (default: mpirun)")
+        parser.add_argument("--wd", default='.', help="Working directory with binaries (default: .)")
         args = parser.parse_args()
 
-        assert shutil.which(args.executor) is not None, f"{args.executor} was not found in path"
+        e = shutil.which(args.executor)
+        assert e is not None, f"{args.executor} was not found in path"
 
-        main(filename=args.filename, ask=args.ask, executor=args.executor, compress=args.compress)
+        main(filename=args.filename,
+             ask=args.ask,
+             executor=e,
+             compress=args.no_compress,
+             plot=args.no_plot,
+             wd=args.wd)

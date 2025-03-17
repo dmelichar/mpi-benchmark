@@ -1,0 +1,23 @@
+{
+  "benchmark_name": "test-scatterv-zipfian-4p",
+  "test_suite": [
+    {
+      "test_name": "scatterv-zipfian",
+      "test_type": "latency",
+      "collective": "scatterv",
+      "messages_data": {
+        "data": "zipfian",
+        "params": {
+          "nproc": 4
+        }
+      }
+    }
+  ],
+  "global_config": {
+    "max_runtime": 3600,
+    "output": {
+      "directory": "./results",
+      "verbose": "false"
+    }
+  }
+}
