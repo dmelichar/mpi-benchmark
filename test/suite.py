@@ -176,7 +176,7 @@ def main(filename: str, executor: str = "mpirun", ask: bool = False, compress: b
                         print("==> Got non-zero error code")
                         raise SystemExit(1)
         if compress:
-            tar = tarfile.open(f"{str(output).tar.gz}", "w:xz")
+            tar = tarfile.open(f"{str(output)}.tar.gz", "w:xz")
             tar.add(output)
             tar.close()
             print(f"==> Created {str(output).tar.gz}")
