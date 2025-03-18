@@ -12,7 +12,7 @@ def plot_dir(dirname: str):
     base = pathlib.Path(dirname)
     files = [f for f in list(base.glob("*")) if not f.name.split("-")[0].isdigit()]
     #files = [f for f in files if "1" in f.name.split("-")[-1]]
-    files = sorted(files)
+    files = sorted(files, key=lambda path: (path.stem.split('-')[1], int(path.stem.split('-')[2][:-1])))
 
     fig, axes = plt.subplots(len(files), 2, figsize=(18, 6*len(files)))
     for f, ax in zip(files, axes):
