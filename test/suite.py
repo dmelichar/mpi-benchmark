@@ -1,21 +1,17 @@
 import datetime
 import pathlib
-import argparse
 import subprocess
 import os
 import shutil
 import sys
 import tarfile
 
-import time
-
 from typing import List, Optional, Union
 
 from pydantic import BaseModel, Field, ValidationError
 
 from plot import plot_dir
-from data import equal, normal, exponential, increasing, decreasing, zipfian, uniform, bucket, spikes, alternating, \
-        two_blocks
+from data import *
 
 
 class TestSuiteItem(BaseModel):
@@ -73,6 +69,7 @@ def generate_data_file(data: str, params: dict):
         else:
                 raise ValueError(f"Unknown test name {data}")
 
+
 def parse_file(filename: str):
         try:
                 json_string = pathlib.Path(filename).read_text()
@@ -85,6 +82,7 @@ def parse_file(filename: str):
                 print("==> Could not find program")
                 print(e)
         raise SystemExit(1)
+
 
 def create_output(dirname: str, ask: bool, no_save: bool, verbose: bool):
         if no_save:
@@ -107,7 +105,8 @@ def create_output(dirname: str, ask: bool, no_save: bool, verbose: bool):
                 print(f"==> Created output directory: {output}")
         return output
 
-def parse_message_data(messages_data: str | dict, output: pathlib.Path):
+
+def parse_message_data(messages_data: Union[str, dict], output: pathlib.Path):
         if isinstance(messages_data, str):
                 # Exisiting file
                 return messages_data
@@ -124,6 +123,7 @@ def parse_message_data(messages_data: str | dict, output: pathlib.Path):
                 _, messages_data = generate_data_file(data, params)
                 return messages_data
 
+
 def run_test(command):
         env = os.environ.copy()
         try:
@@ -133,6 +133,7 @@ def run_test(command):
                 print(e)
                 raise SystemExit(1)
 
+
 def main(filename: str,
          executor: str,
          wd: str = ".",
@@ -140,7 +141,6 @@ def main(filename: str,
          ask: bool = False,
          compress: bool = True,
          plot: bool = True):
-
         no_save = not (compress or plot)
         start = datetime.datetime.now()
 
@@ -149,7 +149,8 @@ def main(filename: str,
         nproc = benchmark.global_config.nproc
 
         cwd = pathlib.Path(wd)
-        output = create_output(dirname=benchmark.global_config.output.directory, ask=ask, no_save=no_save, verbose=verbose)
+        output = create_output(dirname=benchmark.global_config.output.directory, ask=ask, no_save=no_save,
+                               verbose=verbose)
 
         for test in benchmark.test_suite:
                 now = datetime.datetime.now()
@@ -227,13 +228,20 @@ def main(filename: str,
 
 
 if __name__ == "__main__":
+        import argparse
+
         parser = argparse.ArgumentParser()
         parser.add_argument("filename")
-        parser.add_argument("--ask", action='store_true', default=False, help="If set will ask for output directory name (default: False)")
-        parser.add_argument("--no-compress", action='store_false', default=True, help="If set will not create tar.xz for output directory (default=False)")
-        parser.add_argument("--no-plot", action='store_false', default=True, help="If set will not create plots of runs (default=False)")
-        parser.add_argument("--executor", default="mpirun",  help="The executor to run: mpirun or srun (default: mpirun)")
-        parser.add_argument("--mpi-impl", default="openmpi", choices=['openmpi', 'mpich', 'mvapich'], help="MPI implementation to use (default: openmpi)")
+        parser.add_argument("--ask", action='store_true', default=False,
+                            help="If set will ask for output directory name (default: False)")
+        parser.add_argument("--no-compress", action='store_false', default=True,
+                            help="If set will not create tar.xz for output directory (default=False)")
+        parser.add_argument("--no-plot", action='store_false', default=True,
+                            help="If set will not create plots of runs (default=False)")
+        parser.add_argument("--executor", default="mpirun",
+                            help="The executor to run: mpirun or srun (default: mpirun)")
+        parser.add_argument("--mpi-impl", default="openmpi", choices=['openmpi', 'mpich', 'mvapich'],
+                            help="MPI implementation to use (default: openmpi)")
         parser.add_argument("--wd", default='.', help="Working directory with binaries (default: .)")
         args = parser.parse_args()
 
