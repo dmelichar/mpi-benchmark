@@ -136,6 +136,7 @@ def run_test(command):
 def main(filename: str,
          executor: str,
          wd: str = ".",
+         mpi_impl: str = 'openmpi',
          ask: bool = False,
          compress: bool = True,
          plot: bool = True):
@@ -178,11 +179,12 @@ def main(filename: str,
                 mpi_call = cwd.absolute() / test.collective
                 executor_command = []
                 if "srun" in executor:
-                        executor_command.append(str(executor))
+                        executor_command.append("srun")
                         executor_command.append(f"-N{str(nproc)}")
                         executor_command.append("--ntasks-per-node=1")
+                        executor_command.append(f"--mpi={mpi_impl}")
                 elif "mpirun" in executor:
-                        executor_command.append(str(executor))
+                        executor_command.append(f"mpirun.{mpi_impl}")
                         executor_command.append("-np")
                         executor_command.append(str(nproc))
 
@@ -231,6 +233,7 @@ if __name__ == "__main__":
         parser.add_argument("--no-compress", action='store_false', default=True, help="If set will not create tar.xz for output directory (default=False)")
         parser.add_argument("--no-plot", action='store_false', default=True, help="If set will not create plots of runs (default=False)")
         parser.add_argument("--executor", default="mpirun",  help="The executor to run: mpirun or srun (default: mpirun)")
+        parser.add_argument("--mpi-impl", default="openmpi", choices=['openmpi', 'mpich', 'mvapich'], help="MPI implementation to use (default: openmpi)")
         parser.add_argument("--wd", default='.', help="Working directory with binaries (default: .)")
         args = parser.parse_args()
 
@@ -241,5 +244,6 @@ if __name__ == "__main__":
              ask=args.ask,
              executor=e,
              compress=args.no_compress,
+             mpi_impl=args.mpi_impl,
              plot=args.no_plot,
              wd=args.wd)
