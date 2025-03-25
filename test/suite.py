@@ -270,7 +270,7 @@ if __name__ == "__main__":
                             help="If set will not create plots of runs (default=False)")
         parser.add_argument("--executor",
                             default="mpirun",
-                            choices=["mpirun, srun"],
+                            choices=["mpirun", "srun"],
                             help="The job scheduler to use (default: mpirun)")
         parser.add_argument("--mpi-impl",
                             default="openmpi",
