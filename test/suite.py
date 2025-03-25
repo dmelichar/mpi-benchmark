@@ -125,26 +125,20 @@ def parse_message_data(messages_data: Union[str, dict], output: pathlib.Path):
 
 
 def schedule_script(collective: str, executor: str, nproc: str, mpi_impl: str):
-        cmd = ""
+        cmd = "#!/bin/bash\n"
         if "srun" in executor:
                 impl = "openmpi@4.1.6" if mpi_impl == "openmpi" else "mpich@4.1.2"
-                cmd = f"""
-                #!/bin/bash
-                #SBATCH --job-name=mpi_job                      # Name of the job
-                #SBATCH --output=openmpi_output.txt             # Standard output file
-                #SBATCH --error=openmpi_error.txt               # Standard error file
-                #SBATCH --ntasks={nproc}                        # Number of tasks (processes)
-                #SBATCH --time=03:00:00                         # Max runtime (3 hour)
-                
-                spack load {impl}
-                srun {collective}
-                """.strip()
+
+                cmd += "#SBATCH --job-name=mpi_job                      # Name of the job\n"
+                cmd += "#SBATCH --output=openmpi_output.txt             # Standard output file\n"
+                cmd += "#SBATCH --error=openmpi_error.txt               # Standard error file\n"
+                cmd += "#SBATCH --ntasks={nproc}                        # Number of tasks (processes)\n"
+                cmd += "#SBATCH --time=03:00:00                         # Max runtime (3 hour)\n"
+                cmd += f"spack load {impl}\n"
+                cmd += f"srun {collective}\n"
 
         elif "mpirun" in executor:
-                cmd = f"""
-                #!/bin/bash                
-                mpirun.{mpi_impl} -np {nproc} {collective}"
-                """.strip()
+                cmd += f"mpirun.{mpi_impl} -np {nproc} {collective}\n"
 
         return cmd
 
@@ -202,19 +196,19 @@ def main(filename: str,
                 # Name of file where latencies will be saved to
                 foutput = output / f"{test.test_name}.csv" if not no_save else f"{test.test_name}.csv"
 
-                collective_call = str({cwd.absolute() / test.collective})
-                collective_call += f"--fmessages {messages_data}"
-                collective_call += f"--foutput {foutput}"
-                collective_call += f"--timeout {test.timeout}"
+                collective_call = f"{str(cwd.absolute() / test.collective)} "
+                collective_call += f"--fmessages {messages_data} "
+                collective_call += f"--foutput {foutput} "
+                collective_call += f"--timeout {test.timeout} "
                 if verbose:
-                        collective_call += "--verbose"
+                        collective_call += "--verbose "
 
                 # Build script to run
                 script = schedule_script(
                         executor=str(executor),
                         nproc=str(nproc),
                         mpi_impl=str(mpi_impl),
-                        collective=collective_call
+                        collective=str(collective_call)
                 )
                 script_save = output / f"{test.test_name}.slurm"
                 script_save.write_text(script, encoding="utf8")
