@@ -216,7 +216,7 @@ def main(filename: str,
                 script_save.chmod(script_save.stat().st_mode | os.X_OK)
 
                 # Execute the script
-                cmd = "bash " + str(script_save.absolute())
+                cmd = ["bash", str(script_save.absolute())]
                 run_test(cmd)
 
                 # Remove temporary messages file
