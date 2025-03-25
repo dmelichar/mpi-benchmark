@@ -133,7 +133,7 @@ def schedule_script(collective: str, executor: str, nproc: str, mpi_impl: str):
                 cmd += f"#SBATCH --job-name=mpi_job                      # Name of the job\n"
                 cmd += f"#SBATCH --output=openmpi_output.txt             # Standard output file\n"
                 cmd += f"#SBATCH --error=openmpi_error.txt               # Standard error file\n"
-                cmd += f"#SBATCH --ntasks={nproc}                        # Number of tasks (processes)\n"
+                cmd += f"#SBATCH --N{nproc}                              # Number of nodes\n"
                 cmd += f"#SBATCH --time=03:00:00                         # Max runtime (3 hour)\n"
                 cmd += f"spack load {impl}\n"
                 cmd += f"srun {collective}\n"
