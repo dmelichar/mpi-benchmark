@@ -3,7 +3,6 @@ import pathlib
 import subprocess
 import os
 import shutil
-import sys
 import tarfile
 
 from typing import List, Optional, Union
@@ -84,21 +83,22 @@ def parse_file(filename: str):
         raise SystemExit(1)
 
 
-def create_output(dirname: str, ask: bool, no_save: bool, verbose: bool):
+def create_output(dirname: str, no_save: bool, verbose: bool, savename: str):
         if no_save:
                 return pathlib.Path().cwd()
 
         output = pathlib.Path(dirname)
-        if ask and output.exists():
-                print(f"==> Output directory >{output}< exists. Overwrite? [y/n]")
-                overwrite = input()
-                if overwrite == "n":
-                        output = output.parent / f"results-{datetime.datetime.now().strftime('%Y%m%d-%H%M')}"
-                elif overwrite != "y":
-                        print("==> Unknown input. Abort")
-                        sys.exit()
+        if not output.exists():
+                output.mkdir(parents=True)
+
+        if savename is not None:
+                output = output / savename
         else:
-                output = output.parent / f"results-{datetime.datetime.now().strftime('%Y%m%d-%H%M')}"
+                name = f"results-{datetime.datetime.now().strftime('%Y%m%d-%H%M')}"
+                output = output / name
+                if output.exists():
+                        i = len(list(output.parent.glob(name + "*"))) + 1
+                        output = output / f"-{i}"
 
         output.mkdir(parents=True)
         if verbose:
@@ -124,6 +124,31 @@ def parse_message_data(messages_data: Union[str, dict], output: pathlib.Path):
                 return messages_data
 
 
+def schedule_script(collective: str, executor: str, nproc: str, mpi_impl: str):
+        cmd = ""
+        if "srun" in executor:
+                impl = "openmpi@4.1.6" if mpi_impl == "openmpi" else "mpich@4.1.2"
+                cmd = f"""
+                #!/bin/bash
+                #SBATCH --job-name=mpi_job                      # Name of the job
+                #SBATCH --output=openmpi_output.txt             # Standard output file
+                #SBATCH --error=openmpi_error.txt               # Standard error file
+                #SBATCH --ntasks={nproc}                        # Number of tasks (processes)
+                #SBATCH --time=03:00:00                         # Max runtime (3 hour)
+                
+                spack load {impl}
+                srun {collective}
+                """.strip()
+
+        elif "mpirun" in executor:
+                cmd = f"""
+                #!/bin/bash                
+                mpirun.{mpi_impl} -np {nproc} {collective}"
+                """.strip()
+
+        return cmd
+
+
 def run_test(command):
         env = os.environ.copy()
         try:
@@ -133,12 +158,10 @@ def run_test(command):
                 print(e)
                 raise SystemExit(1)
 
-
 def main(filename: str,
          executor: str,
          wd: str = ".",
          mpi_impl: str = 'openmpi',
-         ask: bool = False,
          compress: bool = True,
          plot: bool = True):
         no_save = not (compress or plot)
@@ -149,7 +172,10 @@ def main(filename: str,
         nproc = benchmark.global_config.nproc
 
         cwd = pathlib.Path(wd)
-        output = create_output(dirname=benchmark.global_config.output.directory, ask=ask, no_save=no_save,
+        savename = f"results-{mpi_impl}-{benchmark.benchmark_name}"
+        output = create_output(dirname=benchmark.global_config.output.directory,
+                               savename=savename,
+                               no_save=no_save,
                                verbose=verbose)
 
         for test in benchmark.test_suite:
@@ -176,29 +202,26 @@ def main(filename: str,
                 # Name of file where latencies will be saved to
                 foutput = output / f"{test.test_name}.csv" if not no_save else f"{test.test_name}.csv"
 
-                # Build command to run
-                mpi_call = cwd.absolute() / test.collective
-                executor_command = []
-                if "srun" in executor:
-                        executor_command.append("srun")
-                        executor_command.append(f"-N{str(nproc)}")
-                        executor_command.append("--ntasks-per-node=1")
-                        executor_command.append(f"--mpi={mpi_impl}")
-                elif "mpirun" in executor:
-                        executor_command.append(f"mpirun.{mpi_impl}")
-                        executor_command.append("-np")
-                        executor_command.append(str(nproc))
+                collective_call = str({cwd.absolute() / test.collective})
+                collective_call += f"--fmessages {messages_data}"
+                collective_call += f"--foutput {foutput}"
+                collective_call += f"--timeout {test.timeout}"
+                if verbose:
+                        collective_call += "--verbose"
 
-                mpi_command = [str(mpi_call),
-                               "--fmessages", str(messages_data),
-                               "--foutput", str(foutput),
-                               "--timeout", str(test.timeout),
-                               "--verbose" if verbose else ""
-                               ]
-                command = executor_command + mpi_command
+                # Build script to run
+                script = schedule_script(
+                        executor=str(executor),
+                        nproc=str(nproc),
+                        mpi_impl=str(mpi_impl)
+                )
+                script_save = output / f"{test.test_name}.slurm"
+                script_save.write_text(script, encoding="utf8")
+                script_save.chmod(os.X_OK)
 
-                # Execute the command
-                run_test(command)
+                # Execute the script
+                cmd = "bash " + str(script_save.absolute())
+                run_test(cmd)
 
                 # Remove temporary messages file
                 if no_save:
@@ -232,24 +255,34 @@ if __name__ == "__main__":
 
         parser = argparse.ArgumentParser()
         parser.add_argument("filename")
-        parser.add_argument("--ask", action='store_true', default=False,
+        parser.add_argument("--ask",
+                            action='store_true',
+                            default=False,
                             help="If set will ask for output directory name (default: False)")
-        parser.add_argument("--no-compress", action='store_false', default=True,
+        parser.add_argument("--no-compress",
+                            action='store_false',
+                            default=True,
                             help="If set will not create tar.xz for output directory (default=False)")
-        parser.add_argument("--no-plot", action='store_false', default=True,
+        parser.add_argument("--no-plot",
+                            action='store_false',
+                            default=True,
                             help="If set will not create plots of runs (default=False)")
-        parser.add_argument("--executor", default="mpirun",
+        parser.add_argument("--executor",
+                            default="mpirun",
                             help="The executor to run: mpirun or srun (default: mpirun)")
-        parser.add_argument("--mpi-impl", default="openmpi", choices=['openmpi', 'mpich', 'mvapich'],
+        parser.add_argument("--mpi-impl",
+                            default="openmpi",
+                            options=["openmpi", "mpich"],
                             help="MPI implementation to use (default: openmpi)")
-        parser.add_argument("--wd", default='.', help="Working directory with binaries (default: .)")
+        parser.add_argument("--wd",
+                            default='.',
+                            help="Working directory with binaries (default: .)")
         args = parser.parse_args()
 
         e = shutil.which(args.executor)
         assert e is not None, f"{args.executor} was not found in path"
 
         main(filename=args.filename,
-             ask=args.ask,
              executor=e,
              compress=args.no_compress,
              mpi_impl=args.mpi_impl,
