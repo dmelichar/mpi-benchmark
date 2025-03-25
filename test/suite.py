@@ -96,9 +96,10 @@ def create_output(dirname: str, no_save: bool, verbose: bool, savename: str):
         else:
                 name = f"results-{datetime.datetime.now().strftime('%Y%m%d-%H%M')}"
                 output = output / name
-                if output.exists():
-                        i = len(list(output.parent.glob(name + "*"))) + 1
-                        output = output / f"-{i}"
+
+        if output.exists():
+                i = len(list(output.parent.glob(f"{str(output)}*"))) + 1
+                output = output / f"-{i}"
 
         output.mkdir(parents=True)
         if verbose:
@@ -129,11 +130,11 @@ def schedule_script(collective: str, executor: str, nproc: str, mpi_impl: str):
         if "srun" in executor:
                 impl = "openmpi@4.1.6" if mpi_impl == "openmpi" else "mpich@4.1.2"
 
-                cmd += "#SBATCH --job-name=mpi_job                      # Name of the job\n"
-                cmd += "#SBATCH --output=openmpi_output.txt             # Standard output file\n"
-                cmd += "#SBATCH --error=openmpi_error.txt               # Standard error file\n"
-                cmd += "#SBATCH --ntasks={nproc}                        # Number of tasks (processes)\n"
-                cmd += "#SBATCH --time=03:00:00                         # Max runtime (3 hour)\n"
+                cmd += f"#SBATCH --job-name=mpi_job                      # Name of the job\n"
+                cmd += f"#SBATCH --output=openmpi_output.txt             # Standard output file\n"
+                cmd += f"#SBATCH --error=openmpi_error.txt               # Standard error file\n"
+                cmd += f"#SBATCH --ntasks={nproc}                        # Number of tasks (processes)\n"
+                cmd += f"#SBATCH --time=03:00:00                         # Max runtime (3 hour)\n"
                 cmd += f"spack load {impl}\n"
                 cmd += f"srun {collective}\n"
 
