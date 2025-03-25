@@ -99,7 +99,7 @@ def create_output(dirname: str, no_save: bool, verbose: bool, savename: str):
 
         if output.exists():
                 i = len(list(output.parent.glob(f"{str(output)}*"))) + 1
-                output = output / f"-{i}"
+                output = output.parent / f"{str(output)}-{i}"
 
         output.mkdir(parents=True)
         if verbose:
