@@ -172,7 +172,7 @@ def main(filename: str,
         nproc = benchmark.global_config.nproc
 
         cwd = pathlib.Path(wd)
-        savename = f"results-{mpi_impl}-{benchmark.benchmark_name}"
+        savename = f"{benchmark.benchmark_name}-{mpi_impl}"
         output = create_output(dirname=benchmark.global_config.output.directory,
                                savename=savename,
                                no_save=no_save,
@@ -213,11 +213,12 @@ def main(filename: str,
                 script = schedule_script(
                         executor=str(executor),
                         nproc=str(nproc),
-                        mpi_impl=str(mpi_impl)
+                        mpi_impl=str(mpi_impl),
+                        collective=collective_call
                 )
                 script_save = output / f"{test.test_name}.slurm"
                 script_save.write_text(script, encoding="utf8")
-                script_save.chmod(os.X_OK)
+                script_save.chmod(script_save.stat().st_mode | os.X_OK)
 
                 # Execute the script
                 cmd = "bash " + str(script_save.absolute())
@@ -269,10 +270,11 @@ if __name__ == "__main__":
                             help="If set will not create plots of runs (default=False)")
         parser.add_argument("--executor",
                             default="mpirun",
-                            help="The executor to run: mpirun or srun (default: mpirun)")
+                            choices=["mpirun, srun"],
+                            help="The job scheduler to use (default: mpirun)")
         parser.add_argument("--mpi-impl",
                             default="openmpi",
-                            options=["openmpi", "mpich"],
+                            choices=["openmpi", "mpich"],
                             help="MPI implementation to use (default: openmpi)")
         parser.add_argument("--wd",
                             default='.',
