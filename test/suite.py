@@ -127,6 +127,7 @@ def schedule_script(collective: str, executor: str, nproc: str, mpi_impl: str):
                 cmd += f"#SBATCH --job-name=benchmark_mpi_job\n"
                 cmd += f"#SBATCH --nodes={nproc}\n"
                 cmd += f"#SBATCH --ntasks-per-node=1\n"
+                cmd += "spack load openmpi@4.1.6\n" if "openmpi" in mpi_impl else "spack load mpich@4.1.2\n"
                 cmd += f"srun {collective}\n"
 
         elif "mpirun" in executor:
