@@ -99,7 +99,7 @@ def create_output(dirname: str, no_save: bool, verbose: bool, savename: str):
 
         if output.exists():
                 i = len(list(output.parent.glob(f"{str(output)}*"))) + 1
-                output = pathlib.Path(dirname) / f"{str(output)}-{i}"
+                output = pathlib.Path(f"{str(output.name)}-{i}")
 
         output.mkdir(parents=True)
         if verbose:
@@ -128,15 +128,13 @@ def parse_message_data(messages_data: Union[str, dict], output: pathlib.Path):
 def schedule_script(collective: str, executor: str, nproc: str, mpi_impl: str):
         cmd = "#!/bin/bash\n"
         if "srun" in executor:
-                impl = "openmpi@4.1.6" if mpi_impl == "openmpi" else "mpich@4.1.2"
-
-                cmd += f"#SBATCH --job-name=mpi_job                      # Name of the job\n"
-                cmd += f"#SBATCH --output=openmpi_output.txt             # Standard output file\n"
-                cmd += f"#SBATCH --error=openmpi_error.txt               # Standard error file\n"
-                cmd += f"#SBATCH --nodes={nproc}                        # Number of tasks (processes)\n"
-                cmd += f"#SBATCH --time=03:00:00                         # Max runtime (3 hour)\n"
-                cmd += f"spack load {impl}\n"
-                cmd += f"srun {collective}\n"
+                cmd += f"#SBATCH --job-name=benchmark_mpi_job\n"
+                cmd += f"#SBATCH --output=openmpi_output.txt\n"
+                cmd += f"#SBATCH --error=openmpi_error.txt\n"
+                cmd += f"#SBATCH --nodes={nproc}\n"
+                cmd += f"#SBATCH --ntasks-per-node=1\n"
+                cmd += f"#SBATCH --time=03:00:00\n"
+                cmd += f"{collective}\n"
 
         elif "mpirun" in executor:
                 cmd += f"mpirun.{mpi_impl} -np {nproc} {collective}\n"
@@ -211,12 +209,14 @@ def main(filename: str,
                         mpi_impl=str(mpi_impl),
                         collective=str(collective_call)
                 )
-                script_save = output / f"{test.test_name}.slurm"
+                fe = "slurm" if executor == "srun" else "bash"
+                script_save = output / f"{test.test_name}.{fe}"
                 script_save.write_text(script, encoding="utf8")
                 script_save.chmod(script_save.stat().st_mode | os.X_OK)
 
                 # Execute the script
-                cmd = ["bash", str(script_save.absolute())]
+                ex = "sbatch" if executor == "srun" else "bash"
+                cmd = [ex, str(script_save.absolute())]
                 run_test(cmd)
 
                 # Remove temporary messages file
