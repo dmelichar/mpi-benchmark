@@ -59,7 +59,7 @@ public:
                 sendcounts = new int[csize];
                 if (rank == 0) {
                         std::ifstream file(filename);
-                        if (!file) {
+                        if (!file.is_open()) {
                                 std::cerr << "ERROR: Could not open file " << filename << std::endl;
                                 MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
                         }
@@ -74,7 +74,12 @@ public:
                         std::vector<int> row;
                         std::string val;
                         while (std::getline(ss, val, ',')) {
-                                row.push_back(std::stoi(val));
+                                try {
+                                        row.push_back(std::stoi(val));
+                                } catch (const std::invalid_argument& e) {
+                                        std::cerr << "ERROR: Invalid message data found " << std::endl;
+                                        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+                                }
                         }
                         file.close();
 
@@ -327,6 +332,10 @@ public:
 
 int main(int argc, char *argv[])
 {
+        int rank;
+        MPI_Init(&argc, &argv);
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
         const option long_options[] = {{"help", no_argument, nullptr, 'h'},
                                        {"fmessages", required_argument, nullptr, 'm'},
                                        {"foutput", required_argument, nullptr, 'o'},
@@ -348,14 +357,16 @@ int main(int argc, char *argv[])
                 switch (opt) {
                 case 'h':
                         // @formatter:off
-                        std::cout << "Help: This program runs a MPI scatterv\n"
-                                  << "Options:\n"
-                                  << "  -h, --help            Show this help message\n"
-                                  << "  -m, --fmessages FILE  Specify file with messages (default: default_messages.txt)\n"
-                                  << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
-                                  << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
-                                  << "  -d, --dtype TYPE      Specify char for MPI_CHAR, double MPI_DOUBLE or int for MPI_INT32 (default: double)\n"
-                                  << "  -v, --verbose         Enable verbose mode\n";
+                        if (rank == 0) {
+                                std::cout << "Help: This program runs a MPI scatterv\n"
+                                          << "Options:\n"
+                                          << "  -h, --help            Show this help message\n"
+                                          << "  -m, --fmessages FILE  Specify file with messages (default: default_messages.txt)\n"
+                                          << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
+                                          << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
+                                          << "  -d, --dtype TYPE      Specify char for MPI_CHAR, double MPI_DOUBLE or int for MPI_INT32 (default: double)\n"
+                                          << "  -v, --verbose         Enable verbose mode\n";
+                        }
                         // @formatter:on
                         return EXIT_SUCCESS;
                 case 'm':
@@ -380,7 +391,6 @@ int main(int argc, char *argv[])
                 }
         }
 
-        MPI_Init(&argc, &argv);
         try {
                 if (dtype == "double") {
                         Allgatherv<double> benchmark(fmessages);

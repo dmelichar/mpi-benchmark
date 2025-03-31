@@ -399,6 +399,10 @@ public:
 
 int main(int argc, char *argv[])
 {
+        int rank;
+        MPI_Init(&argc, &argv);
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
         const option long_options[] = {
                         {"help", no_argument, nullptr, 'h'},
                         {"fmessages", required_argument, nullptr, 'm'},
@@ -419,14 +423,16 @@ int main(int argc, char *argv[])
                 switch (opt) {
                 case 'h':
                         // @formatter:off
-                        std::cout << "Help: This program runs a MPI alltoallw\n"
-                                        << "Options:\n"
-                                        << "  -h, --help            Show this help message\n"
-                                        << "  -m, --fmessages FILE  Specify file with messages (default: default_messages.txt)\n"
-                                        << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
-                                        << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
-                                        << "  -v, --verbose         Enable verbose mode\n";
-                // @formatter:on
+                        if (rank == 0) {
+                                std::cout << "Help: This program runs a MPI alltoallw\n"
+                                                << "Options:\n"
+                                                << "  -h, --help            Show this help message\n"
+                                                << "  -m, --fmessages FILE  Specify file with messages (default: default_messages.txt)\n"
+                                                << "  -o, --foutput FILE    Specify output file (default: default_output.txt)\n"
+                                                << "  -t, --timeout NUM     Specify timeout value in seconds (default: 10)\n"
+                                                << "  -v, --verbose         Enable verbose mode\n";
+                        }
+                        // @formatter:on
                         return EXIT_SUCCESS;
                 case 'm':
                         fmessages = optarg;
@@ -447,7 +453,6 @@ int main(int argc, char *argv[])
                 }
         }
 
-        MPI_Init(&argc, &argv);
         try {
                 Alltoallw benchmark(fmessages);
                 benchmark.run(timeout, verbose);
