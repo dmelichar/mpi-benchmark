@@ -98,7 +98,7 @@ def create_output(dirname: str, no_save: bool, verbose: bool, savename: str):
                 output = output / name
 
         if output.exists():
-                i = len(list(output.parent.glob(f"{str(output)}*"))) + 1
+                i = len(list(output.parent.glob(f"{str(output.name)}*"))) + 1
                 output = pathlib.Path(dirname) / pathlib.Path(f"{str(output.name)}-{i}")
 
         output.mkdir(parents=True)
