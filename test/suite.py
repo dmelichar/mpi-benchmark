@@ -110,7 +110,7 @@ def create_output(dirname: str, no_save: bool, verbose: bool, savename: str):
 def parse_message_data(messages_data: Union[str, dict], output: pathlib.Path):
         if isinstance(messages_data, str):
                 # Exisiting file
-                return messages_data
+                return pathlib.Path(messages_data)
         else:
                 # Generate file based on test name and params
                 data = messages_data.get("data")
@@ -122,7 +122,7 @@ def parse_message_data(messages_data: Union[str, dict], output: pathlib.Path):
                         raise SystemExit(1)
 
                 _, messages_data = generate_data_file(data, params)
-                return messages_data
+                return pathlib.Path(messages_data)
 
 
 def schedule_script(collective: str, executor: str, nproc: str, mpi_impl: str):
@@ -196,8 +196,8 @@ def main(filename: str,
                 foutput = output / f"{test.test_name}.csv" if not no_save else f"{test.test_name}.csv"
 
                 collective_call = f"{str(cwd.absolute() / test.collective)} "
-                collective_call += f"--fmessages {messages_data} "
-                collective_call += f"--foutput {foutput} "
+                collective_call += f"--fmessages {messages_data.absolute()} "
+                collective_call += f"--foutput {foutput.absolute()} "
                 collective_call += f"--timeout {test.timeout} "
                 if verbose:
                         collective_call += "--verbose "
@@ -221,8 +221,8 @@ def main(filename: str,
 
                 # Remove temporary messages file
                 if no_save:
-                        pathlib.Path(messages_data).unlink()
-                        pathlib.Path(foutput).unlink()
+                        messages_data.unlink()
+                        foutput.unlink()
 
         if plot:
                 if verbose:
