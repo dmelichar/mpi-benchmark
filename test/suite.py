@@ -99,7 +99,7 @@ def create_output(dirname: str, no_save: bool, verbose: bool, savename: str):
 
         if output.exists():
                 i = len(list(output.parent.glob(f"{str(output)}*"))) + 1
-                output = pathlib.Path(f"{str(output.name)}-{i}")
+                output = pathlib.Path(dirname) / pathlib.Path(f"{str(output.name)}-{i}")
 
         output.mkdir(parents=True)
         if verbose:
@@ -209,13 +209,13 @@ def main(filename: str,
                         mpi_impl=str(mpi_impl),
                         collective=str(collective_call)
                 )
-                fe = "slurm" if executor == "srun" else "bash"
+                fe = "slurm" if "srun" in executor else "bash"
                 script_save = output / f"{test.test_name}.{fe}"
                 script_save.write_text(script, encoding="utf8")
                 script_save.chmod(script_save.stat().st_mode | os.X_OK)
 
                 # Execute the script
-                ex = "sbatch" if executor == "srun" else "bash"
+                ex = "sbatch" if "srun" in executor else "bash"
                 cmd = [ex, str(script_save.absolute())]
                 run_test(cmd)
 
