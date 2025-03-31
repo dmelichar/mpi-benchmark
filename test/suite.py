@@ -3,13 +3,11 @@ import pathlib
 import subprocess
 import os
 import shutil
-import tarfile
 
 from typing import List, Optional, Union
 
 from pydantic import BaseModel, Field, ValidationError
 
-from plot import plot_dir
 from data import *
 
 
@@ -83,9 +81,7 @@ def parse_file(filename: str):
         raise SystemExit(1)
 
 
-def create_output(dirname: str, no_save: bool, verbose: bool, savename: str):
-        if no_save:
-                return pathlib.Path().cwd()
+def create_output(dirname: str, verbose: bool, savename: str):
 
         output = pathlib.Path(dirname)
         if not output.exists():
@@ -133,7 +129,6 @@ def schedule_script(collective: str, executor: str, nproc: str, mpi_impl: str):
                 cmd += f"#SBATCH --error=openmpi_error.txt\n"
                 cmd += f"#SBATCH --nodes={nproc}\n"
                 cmd += f"#SBATCH --ntasks-per-node=1\n"
-                cmd += f"#SBATCH --time=03:00:00\n"
                 cmd += f"{collective}\n"
 
         elif "mpirun" in executor:
@@ -154,10 +149,8 @@ def run_test(command):
 def main(filename: str,
          executor: str,
          wd: str = ".",
-         mpi_impl: str = 'openmpi',
-         compress: bool = True,
-         plot: bool = True):
-        no_save = not (compress or plot)
+         mpi_impl: str = 'openmpi'
+         ):
         start = datetime.datetime.now()
 
         benchmark = parse_file(filename)
@@ -168,7 +161,6 @@ def main(filename: str,
         savename = f"{benchmark.benchmark_name}-{mpi_impl}"
         output = create_output(dirname=benchmark.global_config.output.directory,
                                savename=savename,
-                               no_save=no_save,
                                verbose=verbose)
 
         for test in benchmark.test_suite:
@@ -193,7 +185,7 @@ def main(filename: str,
                 messages_data = parse_message_data(messages_data=test.messages_data, output=output)
 
                 # Name of file where latencies will be saved to
-                foutput = output / f"{test.test_name}.csv" if not no_save else f"{test.test_name}.csv"
+                foutput = output / f"{test.test_name}.csv"
 
                 collective_call = f"{str(cwd.absolute() / test.collective)} "
                 collective_call += f"--fmessages {messages_data.absolute()} "
@@ -219,26 +211,6 @@ def main(filename: str,
                 cmd = [ex, str(script_save.absolute())]
                 run_test(cmd)
 
-                # Remove temporary messages file
-                if no_save:
-                        messages_data.unlink()
-                        foutput.unlink()
-
-        if plot:
-                if verbose:
-                        print(f"==> Plotting test results ... ", end="", flush=True)
-                plot_dir(dirname=str(output))
-                if verbose:
-                        print("Done")
-
-        if compress:
-                if verbose:
-                        print(f"==> Compressing {str(output)}.tar.gz ... ", end="", flush=True)
-                tar = tarfile.open(f"{str(output)}.tar.gz", "w:xz")
-                tar.add(output)
-                tar.close()
-                if verbose:
-                        print("Done")
 
         if verbose:
                 now = datetime.datetime.now()
@@ -255,14 +227,6 @@ if __name__ == "__main__":
                             action='store_true',
                             default=False,
                             help="If set will ask for output directory name (default: False)")
-        parser.add_argument("--no-compress",
-                            action='store_false',
-                            default=True,
-                            help="If set will not create tar.xz for output directory (default=False)")
-        parser.add_argument("--no-plot",
-                            action='store_false',
-                            default=True,
-                            help="If set will not create plots of runs (default=False)")
         parser.add_argument("--executor",
                             default="mpirun",
                             choices=["mpirun", "srun"],
@@ -281,7 +245,5 @@ if __name__ == "__main__":
 
         main(filename=args.filename,
              executor=e,
-             compress=args.no_compress,
              mpi_impl=args.mpi_impl,
-             plot=args.no_plot,
              wd=args.wd)
