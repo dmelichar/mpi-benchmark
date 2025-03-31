@@ -125,8 +125,6 @@ def schedule_script(collective: str, executor: str, nproc: str, mpi_impl: str):
         cmd = "#!/bin/bash\n"
         if "srun" in executor:
                 cmd += f"#SBATCH --job-name=benchmark_mpi_job\n"
-                cmd += f"#SBATCH --output=openmpi_output.txt\n"
-                cmd += f"#SBATCH --error=openmpi_error.txt\n"
                 cmd += f"#SBATCH --nodes={nproc}\n"
                 cmd += f"#SBATCH --ntasks-per-node=1\n"
                 cmd += f"{collective}\n"
