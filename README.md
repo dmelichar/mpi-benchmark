@@ -168,12 +168,14 @@ $$m_i = \frac{\mathop{avg}}{2} + x$$ with $i = 0, 1, ..., nrpoc-1$ and $x \in [1
 
 **spikes**: Generates block sizes with spike values based on a specified average (avg) and spike factor (rho). The block sizes alternate between avg multiplied by rho and 1, for the specified number of processors (nproc). Optionally supports a many-to-many distribution (m2m). It follows that for each 
 
-$$
+``` math
 m_i = \begin{cases}
   \rho * \mathop{avg} && \text{with probability } \frac{1}{\rho} \\ 
   1 && \text{with probability } 1-\frac{1}{\rho}
 \end{cases}
-$$  with $i = 0, 1, ..., nrpoc-1$
+```
+
+with $i = 0, 1, ..., nrpoc-1$
 
 
 **alternating**: Generates alternating block sizes between avg + avg // 2 and avg - avg // 2 for the specified number of processors (nproc). Optionally supports a many-to-many distribution (m2m). It follows that for each 
