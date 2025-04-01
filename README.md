@@ -126,17 +126,59 @@ The `data.py` file generates a CSV file that encodes how many messages are to be
 
 We provide the following distributions:
 
-- **equal**: Generates a uniform distribution of a specified value (val) across a specified number of processors (nproc). Optionally supports a many-to-many distribution (m2m). It follows that for each $$m_i = val$$ with $i = 0, 1, ..., nrpoc-1$
-- **normal**: Generates a normal distribution with a mean of 10 and standard deviation of 15, for a specified number of processors (nproc). Optionally supports a many-to-many distribution (m2m). It follows that for each $$m_i \sim N(10, 15)$$ with $i = 0, 1, ..., nrpoc-1$
-- **exponential**: Generates an exponential distribution with a mean of 50 for the specified number of processors (nproc). Optionally supports a many-to-many distribution (m2m). It follows that for each $$m_i \sim exp(50)$$ with $i = 0, 1, ..., nrpoc-1$
-- **increasing**: Generates an increasing sequence of block sizes based on a specified average block size (avg) and number of processors (nproc). It follows that for each message $$m_i = \left \lfloor \frac{2\mathop{avg}*(i+1)}{\mathop{nproc}-1} \right \rfloor$$ with $i = 0,1,...,nproc-1$ 
-- **decreasing**: Generates a decreasing sequence of block sizes based on a specified average block size (avg) and number of processors (nproc). It follows that for each message $$m_i = \left \lfloor \frac{2\mathop{avg}*(\mathop{nproc}-1)}{\mathop{nproc}} \right \rfloor+1$$ with $i = 0, 1, ..., nproc-1$
-- **zipfian**: Generates a Zipfian (or Zeta) distribution for the specified number of processors (nproc). Optionally supports a many-to-many distribution (m2m)-
-- **uniform**: Generates a uniform distribution of random block sizes around a specified average (avg) for the specified number of processors (nproc). Optionally supports a many-to-many distribution (m2m). It follows that for each $$m_i \in  [1, 2 * \mathop{avg}] $$ with $i = 0, 1, ..., nrpoc-1$
-- **bucket**: Generates block sizes based on a bucket distribution, where the block sizes range between half and the full specified average (avg), for the specified number of processors (nproc). Optionally supports a many-to-many distribution (m2m). It follows that for each $$m_i = \frac{\mathop{avg}}{2} + x$$ with $i = 0, 1, ..., nrpoc-1$ and $x \in [1, \mathop{avg}]$
-- **spikes**: Generates block sizes with spike values based on a specified average (avg) and spike factor (rho). The block sizes alternate between avg multiplied by rho and 1, for the specified number of processors (nproc). Optionally supports a many-to-many distribution (m2m). It follows that for each $$m_i = \begin{cases}\rho * \mathop{avg} && \text{with probability } \frac{1}{\rho} \\ 1 && \text{with probability } 1-\frac{1}{\rho}\end{cases}$$  with $i = 0, 1, ..., nrpoc-1$
-- **alternating**: Generates alternating block sizes between avg + avg // 2 and avg - avg // 2 for the specified number of processors (nproc). Optionally supports a many-to-many distribution (m2m). It follows that for each $$m_i = \begin{cases}\mathop{avg} + \frac{\mathop{avg}}{2} && \text{if } i \text{ is even} \\ \mathop{avg} - \frac{\mathop{avg}}{2} && \text{if } i \text{ is odd}\end{cases} $$ with $i = 0, 1, ..., nrpoc-1$
-- **two_blocks**: Generates a two-block distribution, where the first and last block sizes are set to the specified average (avg), with all other blocks set to 0 for the specified number of processors (nproc). Optionally supports a many-to-many distribution (m2m). It follows that for each $$m_i = \begin{cases}\mathop{avg} && \text{if } i = 0 \text{ or } i = nproc-1 \\ 0 && \text{otherwise}\end{cases} $$ with $i = 0, 1, ..., nrpoc-1$
+
+
+**equal**: Generates a uniform distribution of a specified value (val) across a specified number of processors (nproc). Optionally supports a many-to-many distribution (m2m). It follows that for each
+
+  $$m_i = val$$ with $i = 0, 1, ..., nrpoc-1$
+
+
+**normal**: Generates a normal distribution with a mean of 10 and standard deviation of 15, for a specified number of processors (nproc). Optionally supports a many-to-many distribution (m2m). It follows that for each 
+
+$$m_i \sim N(10, 15)$$ with $i = 0, 1, ..., nrpoc-1$
+
+
+**exponential**: Generates an exponential distribution with a mean of 50 for the specified number of processors (nproc). Optionally supports a many-to-many distribution (m2m). It follows that for each 
+
+$$m_i \sim exp(50)$$ with $i = 0, 1, ..., nrpoc-1$
+
+
+**increasing**: Generates an increasing sequence of block sizes based on a specified average block size (avg) and number of processors (nproc). It follows that for each message 
+
+$$m_i = \left \lfloor \frac{2\mathop{avg}*(i+1)}{\mathop{nproc}-1} \right \rfloor$$ with $i = 0,1,...,nproc-1$ 
+
+
+**decreasing**: Generates a decreasing sequence of block sizes based on a specified average block size (avg) and number of processors (nproc). It follows that for each message 
+
+$$m_i = \left \lfloor \frac{2\mathop{avg}*(\mathop{nproc}-1)}{\mathop{nproc}} \right \rfloor+1$$ with $i = 0, 1, ..., nproc-1$
+
+
+**zipfian**: Generates a Zipfian (or Zeta) distribution for the specified number of processors (nproc). Optionally supports a many-to-many distribution (m2m)
+
+
+**uniform**: Generates a uniform distribution of random block sizes around a specified average (avg) for the specified number of processors (nproc). Optionally supports a many-to-many distribution (m2m). It follows that for each 
+
+$$m_i \in  [1, 2 * \mathop{avg}] $$ with $i = 0, 1, ..., nrpoc-1$
+
+
+**bucket**: Generates block sizes based on a bucket distribution, where the block sizes range between half and the full specified average (avg), for the specified number of processors (nproc). Optionally supports a many-to-many distribution (m2m). It follows that for each 
+
+$$m_i = \frac{\mathop{avg}}{2} + x$$ with $i = 0, 1, ..., nrpoc-1$ and $x \in [1, \mathop{avg}]$
+
+
+**spikes**: Generates block sizes with spike values based on a specified average (avg) and spike factor (rho). The block sizes alternate between avg multiplied by rho and 1, for the specified number of processors (nproc). Optionally supports a many-to-many distribution (m2m). It follows that for each 
+
+$$m_i = \begin{cases}\rho * \mathop{avg} && \text{with probability } \frac{1}{\rho} \\ 1 && \text{with probability } 1-\frac{1}{\rho}\end{cases}$$  with $i = 0, 1, ..., nrpoc-1$
+
+
+**alternating**: Generates alternating block sizes between avg + avg // 2 and avg - avg // 2 for the specified number of processors (nproc). Optionally supports a many-to-many distribution (m2m). It follows that for each 
+
+$$m_i = \begin{cases}\mathop{avg} + \frac{\mathop{avg}}{2} && \text{if } i \text{ is even} \\ \mathop{avg} - \frac{\mathop{avg}}{2} && \text{if } i \text{ is odd}\end{cases} $$ with $i = 0, 1, ..., nrpoc-1$
+
+
+**two_blocks**: Generates a two-block distribution, where the first and last block sizes are set to the specified average (avg), with all other blocks set to 0 for the specified number of processors (nproc). Optionally supports a many-to-many distribution (m2m). It follows that for each
+
+$$m_i = \begin{cases}\mathop{avg} && \text{if } i = 0 \text{ or } i = nproc-1 \\ 0 && \text{otherwise}\end{cases} $$ with $i = 0, 1, ..., nrpoc-1$
 
 
 ## Test suite
